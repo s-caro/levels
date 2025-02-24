@@ -104,7 +104,7 @@ term2_memo = {}
 term2_cache = {}
 t_rec_cache = {}
 
-levels = 3
+levels = 2
 parallel = True
 inside_parallel = False
 max_rec = False
