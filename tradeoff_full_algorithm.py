@@ -23,7 +23,7 @@ import multiprocessing as mp
 
 from functools import partial
 from multiprocessing.pool import ThreadPool  
-
+from functools import lru_cache
 
 
 
@@ -468,7 +468,7 @@ def T_s_fixed_rec_4_levels(c, s, max_recursion, current_recursion=0):
         return min(min_time_alpha_1)
 
 
-
+@lru_cache(maxsize=None)
 def T_rec_5(c, s):
 
     
