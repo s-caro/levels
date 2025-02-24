@@ -84,7 +84,7 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/75
+alpha_steps = 1/100
 precision = 4
 atol = 10**(-precision)
 
@@ -104,12 +104,12 @@ term2_memo = {}
 term2_cache = {}
 t_rec_cache = {}
 
-levels = 5
+levels = 3
 parallel = True
 inside_parallel = False
 max_rec = False
 
-# Recursive function for Ts(c)
+@lru_cache(maxsize=None)
 def T_rec_1(c, s):
 
     alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
@@ -138,7 +138,7 @@ def T_rec_1(c, s):
     return opt_time
 
 
-# Recursive function for Ts(c) with maximum recursion limit
+@lru_cache(maxsize=None)
 def T_s_fixed_rec_2_levels(c, s, max_recursion, current_recursion=0):
 
     # Check if the current recursion depth exceeds the maximum allowed
@@ -186,7 +186,7 @@ def T_s_fixed_rec_2_levels(c, s, max_recursion, current_recursion=0):
         return min(min_time_alpha_1)
 
 
-# Recursive function for Ts(c)
+@lru_cache(maxsize=None)
 def T_rec_2(c, s):
 
     
@@ -226,7 +226,7 @@ def T_rec_2(c, s):
 
 
 
-# Recursive function for Ts(c)
+@lru_cache(maxsize=None)
 def T_rec_3(c, s):
 
     
@@ -274,7 +274,7 @@ def T_rec_3(c, s):
 
 import numpy as np
 
-# Recursive function for Ts(c) with maximum recursion limit
+@lru_cache(maxsize=None)
 def T_s_fixed_rec_3_levels(c, s, max_recursion, current_recursion=0):
 
     # Check if the current recursion depth exceeds the maximum allowed
@@ -335,7 +335,7 @@ def T_s_fixed_rec_3_levels(c, s, max_recursion, current_recursion=0):
     else:
         return min(min_time_alpha_1)
 
-
+@lru_cache(maxsize=None)
 def T_rec_4(c, s):
 
     
@@ -392,7 +392,7 @@ def T_rec_4(c, s):
 
 import numpy as np
 
-# Recursive function for Ts(c) with maximum recursion limit
+@lru_cache(maxsize=None)
 def T_s_fixed_rec_4_levels(c, s, max_recursion, current_recursion=0):
 
     # Check if the current recursion depth exceeds the maximum allowed
@@ -714,7 +714,7 @@ def process_s(s):
     # start_t = time.localtime()
     
     # print(f'\n=========================\n')
-    # print(f'OUTER s: {s} - Start: {time.strftime("%H:%M:%S", start_t)}\n')
+    # print(f'OUTER s: {s} - Start: {time.strftime("%d day, %H:%M:%S", start_t)}\n')
     if levels == 1:
         result = T_rec_1(1,s)
     if levels==2:
@@ -730,7 +730,7 @@ def process_s(s):
     # elapsed_time = et - st
     # end_t = time.localtime()
     
-    # print(f'OUTER s: {s} - End: {time.strftime("%H:%M:%S", end_t)} - In time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}\n')
+    # print(f'OUTER s: {s} - End: {time.strftime("%d day, %H:%M:%S", end_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_time))}\n')
     # print(f'\n=========================\n')
     
     return s, result
@@ -763,7 +763,7 @@ def serial_recursion(s_values):
 
     stAll = time.time()
     startAll_t = time.localtime()
-    #print(f'BEGIN - Start: {time.strftime("%H:%M:%S", startAll_t)}\n')
+    #print(f'BEGIN - Start: {time.strftime("%d day, %H:%M:%S", startAll_t)}\n')
     for s in s_values:
         # get the start time
         st = time.time()
@@ -771,7 +771,7 @@ def serial_recursion(s_values):
 
         print(f'\n=========================\n')
 
-        print(f'OUTER s: {s} - Start: {time.strftime("%H:%M:%S", start_t)}\n')
+        print(f'OUTER s: {s} - Start: {time.strftime("%d day, %H:%M:%S", start_t)}\n')
         if levels == 1:
 
 
@@ -779,25 +779,25 @@ def serial_recursion(s_values):
         if levels==2:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_[i][s] = T_s_fixed_rec_2_levels(1,s, i, 1)
+                    F_s[i][s] = T_s_fixed_rec_2_levels(1,s, i, 1)
             else:
                 F_s[s] = T_rec_2(1,s)
         if levels==3:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_[i][s] = T_s_fixed_rec_3_levels(1,s, i, 1)
+                    F_s[i][s] = T_s_fixed_rec_3_levels(1,s, i, 1)
             else:
                 F_s[s] = T_rec_3(1,s)
         if levels==4:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_[i][s] = T_s_fixed_rec_4_levels(1,s, i, 1)
+                    F_s[i][s] = T_s_fixed_rec_4_levels(1,s, i, 1)
             else:
                 F_s[s] = T_rec_4(1,s)
         if levels==5:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_[i][s] = T_s_fixed_rec_5_levels(1,s, i, 1)
+                    F_s[i][s] = T_s_fixed_rec_5_levels(1,s, i, 1)
             else:
                 F_s[s] = T_rec_5(1,s)
         print(F_s[s])
@@ -812,7 +812,7 @@ def serial_recursion(s_values):
         #print(f'x_values: {x_values}\n')
         #print(f'y_values: {y_values}\n')
 
-        print(f'OUTER s: {s} - End: {time.strftime("%H:%M:%S", end_t)} - In time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}\n')
+        print(f'OUTER s: {s} - End: {time.strftime("%d day, %H:%M:%S", end_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_time))}\n')
         print(f'\n=========================\n')
 
     etAll = time.time()
@@ -820,7 +820,7 @@ def serial_recursion(s_values):
         # get the execution time
     elapsed_timeAll = etAll - stAll
     endAll_t = time.localtime()
-    #print(f'FINISH - End: {time.strftime("%H:%M:%S", endAll_t)} - In time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_timeAll))}\n')
+    #print(f'FINISH - End: {time.strftime("%d day, %H:%M:%S", endAll_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_timeAll))}\n')
 
 
     return F_s
@@ -833,7 +833,7 @@ def main():
     startAll_t = time.localtime()
     # Run the parallelized version
     print(f'\n=========================\n')
-    print(f'START - Start: {time.strftime("%H:%M:%S", startAll_t)}\n')
+    print(f'level: {levels} - START - Start: {time.strftime("%d day, %H:%M:%S", startAll_t)}\n')
 
     if parallel:
         F_s = parallelized_recursion(s_values)
@@ -845,7 +845,7 @@ def main():
     # get the execution time
     elapsed_timeAll = etAll - stAll
     endAll_t = time.localtime()
-    print(f'FINISH - End: {time.strftime("%H:%M:%S", endAll_t)} - In time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_timeAll))}\n')
+    print(f'level: {levels} - FINISH - End: {time.strftime("%d day, %H:%M:%S", endAll_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_timeAll))}\n')
     print(f'\n=========================\n')
     #print(F_s)
     plot_function(F_s)
