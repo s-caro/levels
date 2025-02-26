@@ -85,7 +85,7 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/100
+alpha_steps = 1/90
 precision = 6
 atol = 10**(-precision)
 
@@ -108,10 +108,10 @@ t_rec_cache = {}
 F_s = {}  # Memoization array for each fixed s
 F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 2
-parallel = False
+levels = 5
+parallel = True
 inside_parallel = False
-max_rec = True
+max_rec = False
 
 @lru_cache(maxsize=None)
 def T_rec_1(c, s):
@@ -776,7 +776,8 @@ def parallelized_recursion(s_values):
             s, result = future.result()
             F_s[s] = result
             completed_tasks += 1
-            print(f"Task completed {s}: {completed_tasks}/{total_tasks}")
+            
+            print(f"Task completed {s}: {completed_tasks}/{total_tasks} - Time: {time.strftime('%d %m, %H:%M:%S', time.localtime())}")
     
 
     
