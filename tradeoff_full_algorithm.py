@@ -108,10 +108,10 @@ t_rec_cache = {}
 F_s = {}  # Memoization array for each fixed s
 F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 3
+levels = 1
 parallel = True
 inside_parallel = False
-max_rec = False
+max_rec = True
 
 @lru_cache(maxsize=None)
 def T_rec_1(c, s):
@@ -711,7 +711,7 @@ def plot_function_recursive(F_s_rec):
     plt.plot(x_values, x_values, color = "purple", alpha=0.3, label="s (line)")
     for rec in range(1,max_recursion+1):
          # Sort the s values for proper plotting
-        y_values = [max(F_s_rec[rec][s],s) if F_s[r][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
+        y_values = [max(F_s_rec[rec][s],s) if F_s[rec][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
         y_values_T_s = [F_s_rec[rec][s] for s in x_values]
         y_values_s = [s for s in x_values]
 
@@ -721,7 +721,7 @@ def plot_function_recursive(F_s_rec):
         plt.plot(x_values, y_values_s, color="purple", label="s (line)")
         plt.plot(x_values, y_values_T_s, color="green", label="T_s(1) (line)")
         plt.scatter(x_values, y_values, color="b", label="max(T_s(1),s) (scatter)")
-        plt.scatter(x_values, y_values, s=20, color=colormap(r), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
+        plt.scatter(x_values, y_values, s=20, color=colormap(rec), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
         plt.plot(x_values, y_values, color=colormap(rec), linestyle="--", alpha=((1/(max_recursion+1)) * (rec+1)), label=f"lev: {rec}")
 
           # Sort the s values for proper plotting
@@ -802,7 +802,7 @@ def parallelized_recursion(s_values):
 
     # Parallel processing for each s in s_values
     
-    with ProcessPoolExecutor(20) as executor:
+    with ProcessPoolExecutor() as executor:
         # Map arguments for each s value
         tasks = [executor.submit(process_s, s) for s in s_values]
         total_tasks = len(tasks)
