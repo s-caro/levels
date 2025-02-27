@@ -85,17 +85,18 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/100
+alpha_steps = 1/1000
 precision = 4
 atol = 10**(-precision)
+starting_point = 0.54
 
 # Initialize dictionaries to store results
 
-s_values = np.round(np.arange(0, (1+alpha_steps), alpha_steps), precision)
+s_values = np.round(np.arange(starting_point, (1+alpha_steps), alpha_steps), precision)
 
 
 # Initialize a dictionary to store cached alpha_c values
-max_recursion = 4
+max_recursion = 1
 alpha_c_cache = {}
 
 # Define a global or local dictionary for memoization
@@ -108,7 +109,7 @@ t_rec_cache = {}
 F_s = {}  # Memoization array for each fixed s
 F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 1
+levels = 3
 parallel = True
 inside_parallel = False
 max_rec = True
@@ -116,7 +117,7 @@ max_rec = True
 @lru_cache(maxsize=None)
 def T_rec_1(c, s):
 
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
 
     #c = np.round(c, precision)
@@ -149,7 +150,7 @@ def T_s_fixed_rec_1_levels(c, s, max_recursion, current_recursion):
     # Check if the current recursion depth exceeds the maximum allowed
 
 
-    alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s + alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
     if current_recursion > max_recursion:
         if c<=s:  
@@ -191,48 +192,51 @@ def T_s_fixed_rec_1_levels(c, s, max_recursion, current_recursion):
 def T_s_fixed_rec_2_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > allowed_recu:
-        return None
+    
 
-    alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s + alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
+    if current_recursion > max_recursion:
+        if c<=s:  
+            return c
+    else:
 
-    for alpha_1 in alpha_1_values:
-        if alpha_1 == 0:
-            min_time_alpha_1.append(1)
-        elif c <= alpha_1 and alpha_1 != 0:
-            min_time_alpha_1.append(c)
-        elif c > alpha_1 and alpha_1 != 0:
-            alpha_1_opt = find_alpha_c(c, alpha_1, atol)
+        for alpha_1 in alpha_1_values:
+            if alpha_1 == 0:
+                min_time_alpha_1.append(1)
+            elif c <= alpha_1 and alpha_1 != 0:
+                min_time_alpha_1.append(c)
+            elif c > alpha_1 and alpha_1 != 0:
+                alpha_1_opt = find_alpha_c(c, alpha_1, atol)
 
-            alpha_2_values = np.round(np.arange((alpha_1_opt + alpha_steps), c / 2, alpha_steps), precision)
-            min_time_alpha_2 = []
+                alpha_2_values = np.round(np.arange((alpha_1_opt + alpha_steps), c / 2, alpha_steps), precision)
+                min_time_alpha_2 = []
 
-            if len(alpha_2_values) == 0:
-                min_time_alpha_2.append(c)
-            else:
-                for alpha_2_opt in alpha_2_values:
-                    term1 = f(c, c * alpha_1_opt)
-                    rec_term_2 = T_s_fixed_rec_2_levels((alpha_2_opt - alpha_1_opt) * c, s, allowed_recu, current_recursion + 1)
-                    rec_term_3 =  T_s_fixed_rec_2_levels((0.5 - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
-                    
+                if len(alpha_2_values) == 0:
+                    min_time_alpha_2.append(c)
+                else:
+                    for alpha_2_opt in alpha_2_values:
+                        term1 = f(c, c * alpha_1_opt)
+                        rec_term_2 = T_s_fixed_rec_2_levels((alpha_2_opt - alpha_1_opt) * c, s, allowed_recu, current_recursion + 1)
+                        rec_term_3 =  T_s_fixed_rec_2_levels((0.5 - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                        
 
-                    # If any recursive call returns None, propagate it
-                    if None in (rec_term_2, rec_term_3):
-                        min_time_alpha_2.append(None)
-                    else:
-                        term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + rec_term_2
-                        term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + rec_term_3
-                        min_time_alpha_2.append(max((term1, term2, term3)))
+                        # If any recursive call returns None, propagate it
+                        if None in (rec_term_2, rec_term_3):
+                            min_time_alpha_2.append(None)
+                        else:
+                            term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + rec_term_2
+                            term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + rec_term_3
+                            min_time_alpha_2.append(max((term1, term2, term3)))
 
-            # If any recursive call returns None, propagate it
-            if None in min_time_alpha_2:
-                min_time_alpha_1.append(None)
-            else:
-                min_time_alpha_1.append(min(min_time_alpha_2))
+                # If any recursive call returns None, propagate it
+                if None in min_time_alpha_2 or not min_time_alpha_2:
+                    min_time_alpha_1.append(None)
+                else:
+                    min_time_alpha_1.append(min(min_time_alpha_2))
 
     # If any recursive call returns None, propagate it
-    if None in min_time_alpha_1:
+    if None in min_time_alpha_1 or not min_time_alpha_1:
         return None
     else:
         return min(min_time_alpha_1)
@@ -242,7 +246,7 @@ def T_s_fixed_rec_2_levels(c, s, allowed_recu, current_recursion=1):
 def T_rec_2(c, s):
 
     
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
     #c = np.round(c, precision)
     #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
@@ -282,7 +286,7 @@ def T_rec_2(c, s):
 def T_rec_3(c, s):
 
     
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
     #c = np.round(c, precision)
     #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
@@ -330,11 +334,13 @@ import numpy as np
 def T_s_fixed_rec_3_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > allowed_recu:
-        return None
 
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
+    if current_recursion > max_recursion:
+        if c<=s:  
+            return c
     
     for alpha_1 in alpha_1_values:
         if alpha_1 == 0:
@@ -377,19 +383,19 @@ def T_s_fixed_rec_3_levels(c, s, allowed_recu, current_recursion=1):
                                 min_time_alpha_3.append(max((term1, term2, term3, term4)))
                     
                     # If any recursive call returns None, propagate it
-                    if None in min_time_alpha_3:
+                    if None in min_time_alpha_3 or not min_time_alpha_3:
                         min_time_alpha_2.append(None)
                     else:
                         min_time_alpha_2.append(min(min_time_alpha_3))
             
             # If any recursive call returns None, propagate it
-            if None in min_time_alpha_2:
+            if None in min_time_alpha_2 or not min_time_alpha_2:
                 min_time_alpha_1.append(None)
             else:
                 min_time_alpha_1.append(min(min_time_alpha_2))
 
     # If any recursive call returns None, propagate it
-    if None in min_time_alpha_1:
+    if None in min_time_alpha_1 or not min_time_alpha_1:
         return None
     else:
         return min(min_time_alpha_1)
@@ -398,7 +404,7 @@ def T_s_fixed_rec_3_levels(c, s, allowed_recu, current_recursion=1):
 def T_rec_4(c, s):
 
     
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
     #c = np.round(c, precision)
     #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
@@ -455,11 +461,13 @@ import numpy as np
 def T_s_fixed_rec_4_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > allowed_recu:
-        return None
 
-    alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
+
+    alpha_1_values = np.round(np.arange(starting_point, (s + alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
+    if current_recursion > max_recursion:
+        if c<=s:  
+            return c
 
     for alpha_1 in alpha_1_values:
         if alpha_1 == 0:
@@ -508,25 +516,25 @@ def T_s_fixed_rec_4_levels(c, s, allowed_recu, current_recursion=1):
                                         min_time_alpha_4.append(max((term1, term2, term3, term4, term5)))
 
                             # If any recursive call returns None, propagate it
-                            if None in min_time_alpha_4:
+                            if None in min_time_alpha_4 or not min_time_alpha_4:
                                 min_time_alpha_3.append(None)
                             else:
                                 min_time_alpha_3.append(min(min_time_alpha_4))
 
                     # If any recursive call returns None, propagate it
-                    if None in min_time_alpha_3:
+                    if None in min_time_alpha_3 or not min_time_alpha_3:
                         min_time_alpha_2.append(None)
                     else:
                         min_time_alpha_2.append(min(min_time_alpha_3))
 
             # If any recursive call returns None, propagate it
-            if None in min_time_alpha_2:
+            if None in min_time_alpha_2 or not min_time_alpha_2:
                 min_time_alpha_1.append(None)
             else:
                 min_time_alpha_1.append(min(min_time_alpha_2))
 
     # If any recursive call returns None, propagate it
-    if None in min_time_alpha_1:
+    if None in min_time_alpha_1 or not min_time_alpha_1:
         return None
     else:
         return min(min_time_alpha_1)
@@ -536,7 +544,7 @@ def T_s_fixed_rec_4_levels(c, s, allowed_recu, current_recursion=1):
 def T_rec_5(c, s):
 
     
-    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
     #c = np.round(c, precision)
     #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
@@ -602,11 +610,13 @@ import numpy as np
 def T_s_fixed_rec_5_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > allowed_recu:
-        return None
 
-    alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
+
+    alpha_1_values = np.round(np.arange(starting_point, (s + alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
+    if current_recursion > max_recursion:
+        if c<=s:  
+            return c
 
     for alpha_1 in alpha_1_values:
         if alpha_1 == 0:
@@ -658,31 +668,31 @@ def T_s_fixed_rec_5_levels(c, s, allowed_recu, current_recursion=1):
                                                 min_time_alpha_5.append(max((term1, term2, term3, term4, term5, term6)))
 
                                     # If any recursive call returns None, propagate it
-                                    if None in min_time_alpha_5:
+                                    if None in min_time_alpha_5 or not  min_time_alpha_5:
                                         min_time_alpha_4.append(None)
                                     else:
                                         min_time_alpha_4.append(min(min_time_alpha_5))
 
                             # If any recursive call returns None, propagate it
-                            if None in min_time_alpha_4:
+                            if None in min_time_alpha_4 or not  min_time_alpha_4:
                                 min_time_alpha_3.append(None)
                             else:
                                 min_time_alpha_3.append(min(min_time_alpha_4))
 
                     # If any recursive call returns None, propagate it
-                    if None in min_time_alpha_3:
+                    if None in min_time_alpha_3 or not  min_time_alpha_3:
                         min_time_alpha_2.append(None)
                     else:
                         min_time_alpha_2.append(min(min_time_alpha_3))
 
             # If any recursive call returns None, propagate it
-            if None in min_time_alpha_2:
+            if None in min_time_alpha_2 or not  min_time_alpha_2:
                 min_time_alpha_1.append(None)
             else:
                 min_time_alpha_1.append(min(min_time_alpha_2))
 
     # If any recursive call returns None, propagate it
-    if None in min_time_alpha_1:
+    if None in min_time_alpha_1 or not  min_time_alpha_1:
         return None
     else:
         return min(min_time_alpha_1)
@@ -705,6 +715,7 @@ def plot_function(F_s):
     #plt.plot(x_values, y_values, color="blue", linestyle="--", label="max(T_s(1),s) (line)")
     plt.xlabel("s")
     plt.ylabel(f"T")
+    plt.title(f'Samples {1/alpha_steps} - Max Recursion Level {max_recursion} - {levels} alpha values')
     plt.legend()
     plt.grid(True)
     plt.savefig(f"{levels}\\free recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.pdf")
@@ -720,27 +731,66 @@ def plot_function_recursive(F_s_rec):
     for rec in range(1,max_recursion+1):
          # Sort the s values for proper plotting
         y_values = [max(F_s_rec[rec][s],s) if F_s_rec[rec][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
-        y_values_T_s = [F_s_rec[rec][s] for s in x_values]
-        y_values_s = [s for s in x_values]
+
 
 
         plt.scatter(x_values, y_values, s=20, color=colormap(rec), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
         plt.plot(x_values, y_values, color=colormap(rec), linestyle="--", alpha=((1/(max_recursion+1)) * (rec+1)), label=f"lev: {rec}")
 
-          # Sort the s values for proper plotting
-          # Extract F_s[s][1] for each s
-
-
-            # Scatter and line plot of running times
-        
 
         
     #plt.plot(x_values, y_values, color="blue", linestyle="--", label="max(T_s(1),s) (line)")
+    plt.title(f'Samples {1/alpha_steps} - Max Recursion Level {max_recursion} - {levels} alpha values')
     plt.xlabel("s")
     plt.ylabel(f"T")
     plt.legend()
     plt.grid(True)
     plt.savefig(f"{levels}\\max recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.pdf")
+    plt.close()
+    
+    k_values = np.arange(0, 0.5 + 0.01, 0.01)  # k from 0 to 0.5 with precision 0.01
+
+    # Functions (with n = 1)
+
+    time_values = (1.12717 ** k_values) * (1.82653 ** 1)
+
+    space_values = (0.79703 ** k_values) * (1.82653 ** 1)
+
+    x_values = [2 ** s for s in sorted(F_s_rec[1].keys())] 
+    for rec in range(1,max_recursion+1):
+         # Sort the s values for proper plotting
+         # Sort the s values for proper plotting
+        y_values = [2 ** max(F_s_rec[rec][s],s) if F_s_rec[rec][s] is not None else None for s in sorted(F_s_rec[1].keys())]  # Extract F_s[s][1] for each s
+
+
+
+        plt.scatter(x_values, y_values, s=20, color=colormap(rec), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
+        plt.plot(x_values, y_values, color=colormap(rec), linestyle="--", alpha=((1/(max_recursion+1)) * (rec+1)), label=f"lev: {rec}")
+
+        
+
+
+        # Scatter and line plot of running times
+    plt.figure(figsize=(10, 6))
+
+    plt.scatter(x_values, y_values, color="b", label="max(T_s(1),s) (scatter)")
+    plt.plot(x_values, y_values, color="blue", linestyle="--", label="max(T_s(1),s) (line)")
+
+
+
+    plt.plot(space_values, time_values, label='Time-Space Complexity (line)',linestyle="--", color='purple')
+
+    plt.scatter(space_values, time_values, color="purple", label="Time-Space Complexity (scatter)")
+
+    plt.title(f'Comparison: Samples {1/alpha_steps} - Max Recursion Level {max_recursion} - {levels} alpha values')
+    plt.xlabel("Space Complexity")
+
+    plt.ylabel("Time Complexity")
+    plt.grid(True)
+
+    plt.legend()
+
+    plt.savefig(f"{levels}\\max recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_comparison_rec.pdf")
     plt.close()
 
 def comparison_plot(F_s_par):
@@ -770,7 +820,7 @@ def comparison_plot(F_s_par):
 
     plt.scatter(space_values, time_values, color="purple", label="Time-Space Complexity (scatter)")
 
-
+    plt.title(f'Comparison: Samples {1/alpha_steps} - Max Recursion Level {max_recursion} - {levels} alpha values')
     plt.xlabel("Space Complexity")
 
     plt.ylabel("Time Complexity")
