@@ -85,7 +85,7 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/90
+alpha_steps = 1/100
 precision = 6
 atol = 10**(-precision)
 
@@ -108,7 +108,7 @@ t_rec_cache = {}
 F_s = {}  # Memoization array for each fixed s
 F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 5
+levels = 3
 parallel = True
 inside_parallel = False
 max_rec = False
@@ -140,6 +140,43 @@ def T_rec_1(c, s):
 
 
     return opt_time
+
+
+# Recursive function for Ts(c) with maximum recursion limit
+@lru_cache(maxsize=None)
+def T_s_fixed_rec_1_levels(c, s, max_recursion, current_recursion=0):
+
+    # Check if the current recursion depth exceeds the maximum allowed
+    if current_recursion > max_recursion:
+        return None
+
+    alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+
+    for alpha_1 in alpha_1_values:
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c, alpha_1, atol)
+            term1 = f(c, c / 2) / 2
+            term2 = f(c / 2, alpha_1_opt * c) / 2
+
+            # Recursive call with incremented recursion depth
+            term3 = T_s_fixed_rec_1_levels(c / 2 - alpha_1_opt * c, s, max_recursion, current_recursion + 1)
+
+            # If the recursive call returns None, propagate it
+            if term3 is None:
+                min_time_alpha_1.append(None)
+            else:
+                min_time_alpha_1.append(max((term1 + term2 + term3), alpha_1))
+
+    # If any recursive call returned None, propagate it
+    if None in min_time_alpha_1:
+        return None
+    else:
+        return min(min_time_alpha_1)
 
 
 @lru_cache(maxsize=None)
@@ -662,7 +699,7 @@ def plot_function(F_s):
     plt.ylabel(f"T")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.pdf")
+    plt.savefig(f"{levels}\\free recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.pdf")
     plt.close()
 
 
@@ -700,7 +737,7 @@ def plot_function_recursive(F_s_rec):
     plt.ylabel(f"T")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.pdf")
+    plt.savefig(f"{levels}\\max recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.pdf")
     plt.close()
 
 def comparison_plot(F_s_par):
@@ -738,7 +775,7 @@ def comparison_plot(F_s_par):
 
     plt.legend()
 
-    plt.savefig(f"Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_comparison.pdf")
+    plt.savefig(f"{levels}\\free recursion\\Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_comparison.pdf")
     plt.close()
 
 
@@ -765,7 +802,7 @@ def parallelized_recursion(s_values):
 
     # Parallel processing for each s in s_values
     
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(20) as executor:
         # Map arguments for each s value
         tasks = [executor.submit(process_s, s) for s in s_values]
         total_tasks = len(tasks)
@@ -798,9 +835,13 @@ def serial_recursion(s_values):
 
         print(f'OUTER s: {s} - Start: {time.strftime("%d day, %H:%M:%S", start_t)}\n')
         if levels == 1:
+            if max_rec:
+                for i in range(1,max_recursion+1):
+                    F_s_rec[i][s] = T_s_fixed_rec_1_levels(1,s,i,1)
+                    print(f"done rec: {i}\n")
+            else:
 
-
-            F_s[s] = T_rec_1(1,s)
+                F_s[s] = T_rec_1(1,s)
         if levels==2:
             if max_rec:
                 for i in range(1, max_recursion+1):
@@ -857,7 +898,8 @@ def serial_recursion(s_values):
 # Wrapper function to allow parallel processing of T_s_fixed_rec
 def process_s_max_rec(s, rec):
 
-
+    if levels == 1:
+        result = T_s_fixed_rec_1_levels(1,s,rec,1)
     if levels==2:
         result = T_s_fixed_rec_2_levels(1,s, rec, 1)
     if levels==3:
@@ -887,7 +929,7 @@ def parallelized_recursion_max_rec(s_values, rec):
             s, result = future.result()
             F_s_rec[rec][s] = result
             completed_tasks += 1
-            print(f"Task completed {s}: {completed_tasks}/{total_tasks}")
+            print(f"Rec: {rec} - Task completed {s}: {completed_tasks}/{total_tasks} - Time: {time.strftime('%d %m, %H:%M:%S', time.localtime())}")
     
 
     
@@ -897,6 +939,7 @@ def parallelized_recursion_max_rec(s_values, rec):
 
 
 def main():
+
 
 
     stAll = time.time()
@@ -910,7 +953,7 @@ def main():
            
     if parallel and not max_rec:
         F_s = parallelized_recursion(s_values)
-    else:
+    elif not parallel:
         F_s = serial_recursion(s_values)
 
     etAll = time.time()
@@ -923,13 +966,13 @@ def main():
     #print(F_s)
     if max_rec:
         plot_function_recursive(F_s_rec)
-        with open(f'F_s_rec_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.txt', 'w') as file:
+        with open(f'{levels}\\max recursion\\F_s_rec_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.txt', 'w') as file:
             file.write(json.dumps(F_s_rec)) # use `json.loads` to do the reverse
         print("values saved")
     else:
         plot_function(F_s)
         comparison_plot(F_s)
-        with open(f'F_s_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.txt', 'w') as file:
+        with open(f'{levels}\\free recursion\\F_s_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.txt', 'w') as file:
             file.write(json.dumps(F_s)) # use `json.loads` to do the reverse
         print("values saved")
 
