@@ -85,8 +85,8 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/1000
-precision = 4
+alpha_steps = 1/2000
+precision = 6
 atol = 10**(-precision)
 starting_point = 0.54
 
