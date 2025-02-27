@@ -52,6 +52,7 @@ def f(a, b):
 
 # Optimized function to find alpha_c using ternary search with caching
 # Optimized function to find alpha_c using ternary search with caching
+@lru_cache(maxsize=None)
 def find_alpha_c(c, s, atol):
     # Check if the (s, c) pair is already in the cache
     #print(f'c: {c}, s: {s}, atol: {atol}')
@@ -84,14 +85,14 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/100
-precision = 4
+alpha_steps = 1/90
+precision = 6
 atol = 10**(-precision)
 
 # Initialize dictionaries to store results
 
 s_values = np.round(np.arange(0, (1+alpha_steps), alpha_steps), precision)
-F_s = {}  # Memoization array for each fixed s
+
 
 # Initialize a dictionary to store cached alpha_c values
 max_recursion = 7
@@ -103,8 +104,11 @@ term2_memo = {}
 # Initialize caches
 term2_cache = {}
 t_rec_cache = {}
+ 
+F_s = {}  # Memoization array for each fixed s
+F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 2
+levels = 5
 parallel = True
 inside_parallel = False
 max_rec = False
@@ -139,10 +143,10 @@ def T_rec_1(c, s):
 
 
 @lru_cache(maxsize=None)
-def T_s_fixed_rec_2_levels(c, s, max_recursion, current_recursion=0):
+def T_s_fixed_rec_2_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > max_recursion:
+    if current_recursion > allowed_recu:
         return None
 
     alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
@@ -164,13 +168,16 @@ def T_s_fixed_rec_2_levels(c, s, max_recursion, current_recursion=0):
             else:
                 for alpha_2_opt in alpha_2_values:
                     term1 = f(c, c * alpha_1_opt)
-                    term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + T_rec_2((alpha_2_opt - alpha_1_opt) * c, s, max_recursion, current_recursion + 1)
-                    term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + T_rec_2((0.5 - alpha_2_opt) * c, s, max_recursion, current_recursion + 1)
+                    rec_term_2 = T_s_fixed_rec_2_levels((alpha_2_opt - alpha_1_opt) * c, s, allowed_recu, current_recursion + 1)
+                    rec_term_3 =  T_s_fixed_rec_2_levels((0.5 - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                    
 
                     # If any recursive call returns None, propagate it
-                    if None in (term2, term3):
+                    if None in (rec_term_2, rec_term_3):
                         min_time_alpha_2.append(None)
                     else:
+                        term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + rec_term_2
+                        term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + rec_term_3
                         min_time_alpha_2.append(max((term1, term2, term3)))
 
             # If any recursive call returns None, propagate it
@@ -275,10 +282,10 @@ def T_rec_3(c, s):
 import numpy as np
 
 @lru_cache(maxsize=None)
-def T_s_fixed_rec_3_levels(c, s, max_recursion, current_recursion=0):
+def T_s_fixed_rec_3_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > max_recursion:
+    if current_recursion > allowed_recu:
         return None
 
     alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
@@ -307,14 +314,21 @@ def T_s_fixed_rec_3_levels(c, s, max_recursion, current_recursion=0):
                     else:
                         for alpha_3_opt in alpha_3_values:
                             term1 = f(c, c*alpha_1_opt)
-                            term2 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + f(c*alpha_2_opt, c*alpha_1_opt)/2 + T_s_fixed_rec_3_levels((alpha_2_opt - alpha_1_opt)*c, s, max_recursion, current_recursion + 1)
-                            term3 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + T_s_fixed_rec_3_levels((0.5 - alpha_2_opt)*c, s, max_recursion, current_recursion + 1)
-                            term4 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + f(c*alpha_2_opt, c*alpha_1_opt)/2 + f(c*alpha_3_opt, c*alpha_2_opt)/2 + T_s_fixed_rec_3_levels((alpha_3_opt - alpha_2_opt)*c, s, max_recursion, current_recursion + 1)
+                            rec_term_2 = T_s_fixed_rec_3_levels((alpha_2_opt - alpha_1_opt)*c, s, allowed_recu, current_recursion + 1)
+                            rec_term_3 =T_s_fixed_rec_3_levels((0.5 - alpha_2_opt)*c, s, allowed_recu, current_recursion + 1)
+                            rec_term_4 = T_s_fixed_rec_3_levels((alpha_3_opt - alpha_2_opt)*c, s, allowed_recu, current_recursion + 1)
+                            
                             
                             # If any recursive call returns None, propagate it
-                            if None in (term2, term3, term4):
+                            if None in (rec_term_2, rec_term_3, rec_term_4):
                                 min_time_alpha_3.append(None)
                             else:
+                                term2 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + f(c*alpha_2_opt, c*alpha_1_opt)/2 + rec_term_2
+                                term3 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + rec_term_3
+                                term4 = f(c, c*0.5)/2 + f(c*0.5, c*alpha_2_opt)/2 + f(c*alpha_2_opt, c*alpha_1_opt)/2 + f(c*alpha_3_opt, c*alpha_2_opt)/2 + rec_term_4
+                                 
+                                
+                                 
                                 min_time_alpha_3.append(max((term1, term2, term3, term4)))
                     
                     # If any recursive call returns None, propagate it
@@ -393,10 +407,10 @@ def T_rec_4(c, s):
 import numpy as np
 
 @lru_cache(maxsize=None)
-def T_s_fixed_rec_4_levels(c, s, max_recursion, current_recursion=0):
+def T_s_fixed_rec_4_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > max_recursion:
+    if current_recursion > allowed_recu:
         return None
 
     alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
@@ -432,15 +446,20 @@ def T_s_fixed_rec_4_levels(c, s, max_recursion, current_recursion=0):
                             else:
                                 for alpha_4_opt in alpha_4_values:
                                     term1 = f(c, c * alpha_1_opt)
-                                    term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + T_rec_4_serial((0.5 - alpha_2_opt) * c, s, max_recursion, current_recursion + 1)
-                                    term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + T_s_fixed_rec_4_levels((alpha_2_opt - alpha_1_opt) * c, s, max_recursion, current_recursion + 1)
-                                    term4 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + T_s_fixed_rec_4_levels((alpha_3_opt - alpha_2_opt) * c, s, max_recursion, current_recursion + 1)
-                                    term5 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + T_s_fixed_rec_4_levels((alpha_4_opt - alpha_3_opt) * c, s, max_recursion, current_recursion + 1)
-
+                                    rec_term_2 = T_s_fixed_rec_4_levels((0.5 - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                                    rec_term_3 = T_s_fixed_rec_4_levels((alpha_2_opt - alpha_1_opt) * c, s, allowed_recu, current_recursion + 1)
+                                    rec_term_4 =T_s_fixed_rec_4_levels((alpha_3_opt - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                                    rec_term_5 =T_s_fixed_rec_4_levels((alpha_4_opt - alpha_3_opt) * c, s, allowed_recu, current_recursion + 1)
+                                    
                                     # If any recursive call returns None, propagate it
-                                    if None in (term2, term3, term4, term5):
+                                    if None in (rec_term_2, rec_term_3, rec_term_4, rec_term_5):
                                         min_time_alpha_4.append(None)
                                     else:
+                                        term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + rec_term_2
+                                        term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + rec_term_3
+                                        term4 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + rec_term_4
+                                        term5 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + rec_term_5
+
                                         min_time_alpha_4.append(max((term1, term2, term3, term4, term5)))
 
                             # If any recursive call returns None, propagate it
@@ -535,10 +554,10 @@ def T_rec_5(c, s):
 import numpy as np
 
 # Recursive function for Ts(c) with maximum recursion limit
-def T_s_fixed_rec_5_levels(c, s, max_recursion, current_recursion=0):
+def T_s_fixed_rec_5_levels(c, s, allowed_recu, current_recursion=1):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > max_recursion:
+    if current_recursion > allowed_recu:
         return None
 
     alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
@@ -581,11 +600,11 @@ def T_s_fixed_rec_5_levels(c, s, max_recursion, current_recursion=0):
                                     else:
                                         for alpha_5_opt in alpha_5_values:
                                             term1 = f(c, c * alpha_1_opt)
-                                            term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + T_s_fixed_rec_5_levels((0.5 - alpha_2_opt) * c, s, max_recursion, current_recursion + 1)
-                                            term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + T_s_fixed_rec_5_levels((alpha_2_opt - alpha_1_opt) * c, s, max_recursion, current_recursion + 1)
-                                            term4 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + T_s_fixed_rec_5_levels((alpha_3_opt - alpha_2_opt) * c, s, max_recursion, current_recursion + 1)
-                                            term5 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + T_s_fixed_rec_5_levels((alpha_4_opt - alpha_3_opt) * c, s, max_recursion, current_recursion + 1)
-                                            term6 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + f(c * alpha_5_opt, c * alpha_4_opt) / 2 + T_s_fixed_rec_5_levels((alpha_5_opt - alpha_4_opt) * c, s, max_recursion, current_recursion + 1)
+                                            term3 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + T_s_fixed_rec_5_levels((0.5 - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                                            term2 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + T_s_fixed_rec_5_levels((alpha_2_opt - alpha_1_opt) * c, s, allowed_recu, current_recursion + 1)
+                                            term4 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + T_s_fixed_rec_5_levels((alpha_3_opt - alpha_2_opt) * c, s, allowed_recu, current_recursion + 1)
+                                            term5 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + T_s_fixed_rec_5_levels((alpha_4_opt - alpha_3_opt) * c, s, allowed_recu, current_recursion + 1)
+                                            term6 = f(c, c * 0.5) / 2 + f(c * 0.5, c * alpha_2_opt) / 2 + f(c * alpha_2_opt, c * alpha_1_opt) / 2 + f(c * alpha_3_opt, c * alpha_2_opt) / 2 + f(c * alpha_4_opt, c * alpha_3_opt) / 2 + f(c * alpha_5_opt, c * alpha_4_opt) / 2 + T_s_fixed_rec_5_levels((alpha_5_opt - alpha_4_opt) * c, s, allowed_recu, current_recursion + 1)
 
                                             # If any recursive call returns None, propagate it
                                             if None in (term2, term3, term4, term5, term6):
@@ -647,25 +666,41 @@ def plot_function(F_s):
     plt.close()
 
 
-def plot_function_recursive(F_s):
+def plot_function_recursive(F_s_rec):
     # Extract the keys (s values) and corresponding F_s[s][1] values
-    x_values = sorted(F_s.keys())  # Sort the s values for proper plotting
-    y_values = [max(F_s[s],s) for s in x_values]  # Extract F_s[s][1] for each s
-    y_values_T_s = [F_s[s] for s in x_values]
-    y_values_s = [s for s in x_values]
-
-
-        # Scatter and line plot of running times
+    x_values = sorted(s_values)
+    colormap = plt.get_cmap("viridis", (max_recursion+1))
     plt.figure(figsize=(10, 6))
-    plt.plot(x_values, y_values_s, color="purple", label="s (line)")
-    plt.plot(x_values, y_values_T_s, color="green", label="T_s(1) (line)")
-    plt.scatter(x_values, y_values, color="b", label="max(T_s(1),s) (scatter)")
+    plt.plot(x_values, x_values, color = "purple", alpha=0.3, label="s (line)")
+    for rec in range(1,max_recursion+1):
+         # Sort the s values for proper plotting
+        y_values = [max(F_s_rec[rec][s],s) if F_s[r][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
+        y_values_T_s = [F_s_rec[rec][s] for s in x_values]
+        y_values_s = [s for s in x_values]
+
+
+            # Scatter and line plot of running times
+        plt.figure(figsize=(10, 6))
+        plt.plot(x_values, y_values_s, color="purple", label="s (line)")
+        plt.plot(x_values, y_values_T_s, color="green", label="T_s(1) (line)")
+        plt.scatter(x_values, y_values, color="b", label="max(T_s(1),s) (scatter)")
+        plt.scatter(x_values, y_values, s=20, color=colormap(r), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
+        plt.plot(x_values, y_values, color=colormap(rec), linestyle="--", alpha=((1/(max_recursion+1)) * (rec+1)), label=f"lev: {rec}")
+
+          # Sort the s values for proper plotting
+          # Extract F_s[s][1] for each s
+
+
+            # Scatter and line plot of running times
+        
+
+        
     #plt.plot(x_values, y_values, color="blue", linestyle="--", label="max(T_s(1),s) (line)")
     plt.xlabel("s")
     plt.ylabel(f"T")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.pdf")
+    plt.savefig(f"Running_time_s_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.pdf")
     plt.close()
 
 def comparison_plot(F_s_par):
@@ -709,12 +744,7 @@ def comparison_plot(F_s_par):
 
 # Wrapper function to allow parallel processing of T_s_fixed_rec
 def process_s(s):
-    # get the start time
-    # st = time.time()
-    # start_t = time.localtime()
-    
-    # print(f'\n=========================\n')
-    # print(f'OUTER s: {s} - Start: {time.strftime("%d day, %H:%M:%S", start_t)}\n')
+
     if levels == 1:
         result = T_rec_1(1,s)
     if levels==2:
@@ -725,13 +755,7 @@ def process_s(s):
         result = T_rec_4(1,s)
     if levels==5:
         result = T_rec_5(1,s)
-    # get the end time
-    # et = time.time()
-    # elapsed_time = et - st
-    # end_t = time.localtime()
-    
-    # print(f'OUTER s: {s} - End: {time.strftime("%d day, %H:%M:%S", end_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_time))}\n')
-    # print(f'\n=========================\n')
+
     
     return s, result
 
@@ -752,7 +776,8 @@ def parallelized_recursion(s_values):
             s, result = future.result()
             F_s[s] = result
             completed_tasks += 1
-            print(f"Task completed {s}: {completed_tasks}/{total_tasks}")
+            
+            print(f"Task completed {s}: {completed_tasks}/{total_tasks} - Time: {time.strftime('%d %m, %H:%M:%S', time.localtime())}")
     
 
     
@@ -779,28 +804,32 @@ def serial_recursion(s_values):
         if levels==2:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_s[i][s] = T_s_fixed_rec_2_levels(1,s, i, 1)
+                    F_s_rec[i][s] = T_s_fixed_rec_2_levels(1,s, i, 1)
+                    print(f"done rec: {i}\n")
             else:
                 F_s[s] = T_rec_2(1,s)
         if levels==3:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_s[i][s] = T_s_fixed_rec_3_levels(1,s, i, 1)
+                    F_s_rec[i][s] = T_s_fixed_rec_3_levels(1,s, i, 1)
+                    print(f"done rec: {i}\n")
             else:
                 F_s[s] = T_rec_3(1,s)
         if levels==4:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_s[i][s] = T_s_fixed_rec_4_levels(1,s, i, 1)
+                    F_s_rec[i][s] = T_s_fixed_rec_4_levels(1,s, i, 1)
+                    print(f"done rec: {i}\n")
             else:
                 F_s[s] = T_rec_4(1,s)
         if levels==5:
             if max_rec:
                 for i in range(1, max_recursion+1):
-                    F_s[i][s] = T_s_fixed_rec_5_levels(1,s, i, 1)
+                    F_s_rec[i][s] = T_s_fixed_rec_5_levels(1,s, i, 1)
+                    print(f"done rec: {i}\n")
             else:
                 F_s[s] = T_rec_5(1,s)
-        print(F_s[s])
+        #print(F_s[s])
         # get the end time
         et = time.time()
 
@@ -825,6 +854,47 @@ def serial_recursion(s_values):
 
     return F_s
 
+# Wrapper function to allow parallel processing of T_s_fixed_rec
+def process_s_max_rec(s, rec):
+
+
+    if levels==2:
+        result = T_s_fixed_rec_2_levels(1,s, rec, 1)
+    if levels==3:
+        result = T_s_fixed_rec_3_levels(1,s, rec, 1)
+    if levels==4:
+        result = T_s_fixed_rec_4_levels(1,s, rec, 1)
+    if levels==5:
+        result = T_s_fixed_rec_5_levels(1,s, rec, 1)
+
+    
+    return s, result
+
+# Main parallelized loop
+def parallelized_recursion_max_rec(s_values, rec):
+    max_cores = multiprocessing.cpu_count()  # Number of available CPU cores
+
+    # Parallel processing for each s in s_values
+    
+    with ProcessPoolExecutor() as executor:
+        # Map arguments for each s value
+        tasks = [executor.submit(process_s_max_rec, s, rec) for s in s_values]
+        total_tasks = len(tasks)
+        completed_tasks = 0
+        
+        # Retrieve results as they complete
+        for future in as_completed(tasks):
+            s, result = future.result()
+            F_s_rec[rec][s] = result
+            completed_tasks += 1
+            print(f"Task completed {s}: {completed_tasks}/{total_tasks}")
+    
+
+    
+
+    return F_s
+
+
 
 def main():
 
@@ -834,8 +904,11 @@ def main():
     # Run the parallelized version
     print(f'\n=========================\n')
     print(f'level: {levels} - START - Start: {time.strftime("%d day, %H:%M:%S", startAll_t)}\n')
-
-    if parallel:
+    if parallel and max_rec:
+        for i in range(1, max_recursion+1):
+            parallelized_recursion_max_rec(s_values, i)
+           
+    if parallel and not max_rec:
         F_s = parallelized_recursion(s_values)
     else:
         F_s = serial_recursion(s_values)
@@ -848,11 +921,17 @@ def main():
     print(f'level: {levels} - FINISH - End: {time.strftime("%d day, %H:%M:%S", endAll_t)} - In time: {time.strftime("%d day, %H:%M:%S", time.gmtime(elapsed_timeAll))}\n')
     print(f'\n=========================\n')
     #print(F_s)
-    plot_function(F_s)
-    comparison_plot(F_s)
-    with open(f'F_s_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.txt', 'w') as file:
-        file.write(json.dumps(F_s)) # use `json.loads` to do the reverse
-    print("values saved")
+    if max_rec:
+        plot_function_recursive(F_s_rec)
+        with open(f'F_s_rec_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}_max_rec_{max_rec}_{max_recursion}.txt', 'w') as file:
+            file.write(json.dumps(F_s_rec)) # use `json.loads` to do the reverse
+        print("values saved")
+    else:
+        plot_function(F_s)
+        comparison_plot(F_s)
+        with open(f'F_s_values_{alpha_steps}_precision_{atol}_parallel_{parallel}_inside_{inside_parallel}_{levels}.txt', 'w') as file:
+            file.write(json.dumps(F_s)) # use `json.loads` to do the reverse
+        print("values saved")
 
 if __name__ == "__main__":
     main()
