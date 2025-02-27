@@ -86,7 +86,7 @@ def find_alpha_c(c, s, atol):
 
 # Parameters for s and atol
 alpha_steps = 1/100
-precision = 6
+precision = 4
 atol = 10**(-precision)
 
 # Initialize dictionaries to store results
@@ -95,7 +95,7 @@ s_values = np.round(np.arange(0, (1+alpha_steps), alpha_steps), precision)
 
 
 # Initialize a dictionary to store cached alpha_c values
-max_recursion = 7
+max_recursion = 4
 alpha_c_cache = {}
 
 # Define a global or local dictionary for memoization
@@ -144,39 +144,47 @@ def T_rec_1(c, s):
 
 # Recursive function for Ts(c) with maximum recursion limit
 @lru_cache(maxsize=None)
-def T_s_fixed_rec_1_levels(c, s, max_recursion, current_recursion=0):
+def T_s_fixed_rec_1_levels(c, s, max_recursion, current_recursion):
 
     # Check if the current recursion depth exceeds the maximum allowed
-    if current_recursion > max_recursion:
-        return None
+
 
     alpha_1_values = np.round(np.arange(0, (s + alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
+    if current_recursion > max_recursion:
+        if c<=s:  
+            return c
+    else:
+        for alpha_1 in alpha_1_values:
+            if alpha_1 == 0:
+                min_time_alpha_1.append(1)
+            elif c <= alpha_1 and alpha_1 != 0:
+                min_time_alpha_1.append(c)
+            elif c > alpha_1 and alpha_1 != 0:
+                alpha_1_opt = find_alpha_c(c, alpha_1, atol)
+                term1 = f(c, c / 2) / 2
+                term2 = f(c / 2, alpha_1_opt * c) / 2
 
-    for alpha_1 in alpha_1_values:
-        if alpha_1 == 0:
-            min_time_alpha_1.append(1)
-        elif c <= alpha_1 and alpha_1 != 0:
-            min_time_alpha_1.append(c)
-        elif c > alpha_1 and alpha_1 != 0:
-            alpha_1_opt = find_alpha_c(c, alpha_1, atol)
-            term1 = f(c, c / 2) / 2
-            term2 = f(c / 2, alpha_1_opt * c) / 2
+                # Recursive call with incremented recursion depth
+                term3 = T_s_fixed_rec_1_levels(c / 2 - alpha_1_opt * c, s, max_recursion, current_recursion + 1)
 
-            # Recursive call with incremented recursion depth
-            term3 = T_s_fixed_rec_1_levels(c / 2 - alpha_1_opt * c, s, max_recursion, current_recursion + 1)
+                # If the recursive call returns None, propagate it
+                if term3 is None:
+                    min_time_alpha_1.append(None)
+                else:
+                    min_time_alpha_1.append(max((term1 + term2 + term3), alpha_1))
 
-            # If the recursive call returns None, propagate it
-            if term3 is None:
-                min_time_alpha_1.append(None)
-            else:
-                min_time_alpha_1.append(max((term1 + term2 + term3), alpha_1))
+                    
 
-    # If any recursive call returned None, propagate it
-    if None in min_time_alpha_1:
+    if None in min_time_alpha_1 or not min_time_alpha_1:
         return None
     else:
         return min(min_time_alpha_1)
+
+
+    # If any recursive call returns None, propagate it
+
+
 
 
 @lru_cache(maxsize=None)
@@ -711,16 +719,11 @@ def plot_function_recursive(F_s_rec):
     plt.plot(x_values, x_values, color = "purple", alpha=0.3, label="s (line)")
     for rec in range(1,max_recursion+1):
          # Sort the s values for proper plotting
-        y_values = [max(F_s_rec[rec][s],s) if F_s[rec][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
+        y_values = [max(F_s_rec[rec][s],s) if F_s_rec[rec][s] is not None else None for s in x_values]  # Extract F_s[s][1] for each s
         y_values_T_s = [F_s_rec[rec][s] for s in x_values]
         y_values_s = [s for s in x_values]
 
 
-            # Scatter and line plot of running times
-        plt.figure(figsize=(10, 6))
-        plt.plot(x_values, y_values_s, color="purple", label="s (line)")
-        plt.plot(x_values, y_values_T_s, color="green", label="T_s(1) (line)")
-        plt.scatter(x_values, y_values, color="b", label="max(T_s(1),s) (scatter)")
         plt.scatter(x_values, y_values, s=20, color=colormap(rec), alpha=((1/(max_recursion+1)) * (rec+1)),label=f"lev: {rec}")
         plt.plot(x_values, y_values, color=colormap(rec), linestyle="--", alpha=((1/(max_recursion+1)) * (rec+1)), label=f"lev: {rec}")
 
@@ -837,6 +840,7 @@ def serial_recursion(s_values):
         if levels == 1:
             if max_rec:
                 for i in range(1,max_recursion+1):
+                    
                     F_s_rec[i][s] = T_s_fixed_rec_1_levels(1,s,i,1)
                     print(f"done rec: {i}\n")
             else:

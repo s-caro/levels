@@ -63,7 +63,7 @@ def find_alpha_c(c, s, atol):
             return result
 
 alpha_steps = 1/100
-precision = 6
+precision = 4
 atol = 10**(-precision)
 alpha_c_cache = {}
 
@@ -71,7 +71,7 @@ F_s = {}
 
 
 
-@lru_cache(maxsize=None)
+""" @lru_cache(maxsize=None)
 def T_rec_1(c, s):
     alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
     min_time_alpha_1 = []
@@ -265,9 +265,251 @@ def T_rec_5(c, s):
             min_time_alpha_1.append(min(min_time_alpha_2, key=lambda x: x[0]))
 
     opt_time, opt_alphas_5 = min(min_time_alpha_1, key=lambda x: x[0])
-    return opt_time, opt_alphas_5
+    return opt_time, opt_alphas_5 """
 
 
+
+@lru_cache(maxsize=None)
+def T_rec_1(c, s):
+
+    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+
+    #c = np.round(c, precision)
+
+    for alpha_1 in alpha_1_values:
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c, alpha_1, atol)
+            term1 = f(c, c / 2) / 2
+            term2 = f(c / 2, alpha_1_opt * c) / 2
+
+            term3 = T_rec_1(c / 2 - alpha_1_opt * c, s)
+            min_time_alpha_1.append(max((term1 + term2 + term3),alpha_1))
+
+    opt_time =  min(min_time_alpha_1)
+
+
+    return opt_time
+
+
+
+
+
+@lru_cache(maxsize=None)
+def T_rec_2(c, s):
+
+    
+    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+                    term1 = f(c,c*alpha_1_opt)
+                    #print(f'alpha_2_opt - alpha_1_opt: {alpha_2_opt} - {alpha_1_opt} =  {alpha_2_opt - alpha_1_opt}')
+                    term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_2((alpha_2_opt - alpha_1_opt)*c,s)
+
+                    term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_2((0.5 - alpha_2_opt)*c,s)
+                    min_time_alpha_2.append(max((term1,term2,term3)))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+
+
+    return opt_time
+
+
+
+@lru_cache(maxsize=None)
+def T_rec_3(c, s):
+
+    
+    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+
+                    alpha_3_values = np.round(np.arange((alpha_2_opt+alpha_steps),c/2,alpha_steps), precision)
+                    min_time_alpha_3 = []
+                    if len(alpha_3_values) == 0:
+                        min_time_alpha_3.append(c)
+                    else:
+                        for alpha_3_opt in alpha_3_values:
+                            term1 = f(c,c*alpha_1_opt)
+                            term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_3((alpha_2_opt - alpha_1_opt)*c,s)
+
+                            term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_3((0.5 - alpha_2_opt)*c,s)
+                            term4 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + T_rec_3((alpha_3_opt-alpha_2_opt)*c,s)
+                            min_time_alpha_3.append(max((term1,term2,term3,term4)))
+                    min_time_alpha_2.append(min(min_time_alpha_3))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+
+
+    return opt_time
+
+
+
+
+@lru_cache(maxsize=None)
+def T_rec_4(c, s):
+
+    
+    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+
+                    alpha_3_values = np.round(np.arange((alpha_2_opt+alpha_steps),c/2,alpha_steps), precision)
+                    min_time_alpha_3 = []
+                    if len(alpha_3_values) == 0:
+                        min_time_alpha_3.append(c)
+                    else:
+                        for alpha_3_opt in alpha_3_values:
+                            alpha_4_values = np.round(np.arange((alpha_3_opt+alpha_steps),c/2,alpha_steps), precision)
+                            min_time_alpha_4 = []
+                            if len(alpha_4_values) == 0:
+                                min_time_alpha_4.append(c)
+                            else:
+                                for alpha_4_opt in alpha_4_values:
+                                    term1 = f(c,c*alpha_1_opt)
+                                    term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_4((0.5 - alpha_2_opt)*c,s)
+                                    term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_4((alpha_2_opt - alpha_1_opt)*c,s)
+
+                                    
+                                    term4 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + T_rec_4((alpha_3_opt-alpha_2_opt)*c,s)
+                                    term5 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + f(c*alpha_4_opt,c*alpha_3_opt)/2 + T_rec_4((alpha_4_opt-alpha_3_opt)*c,s)
+                                    min_time_alpha_4.append(max((term1,term2,term3,term4,term5)))
+                            min_time_alpha_3.append(min(min_time_alpha_4))
+                    min_time_alpha_2.append(min(min_time_alpha_3))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+
+
+    return opt_time
+
+
+
+
+@lru_cache(maxsize=None)
+def T_rec_5(c, s):
+
+    
+    alpha_1_values = np.round(np.arange(0, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+
+                    alpha_3_values = np.round(np.arange((alpha_2_opt+alpha_steps),c/2,alpha_steps), precision)
+                    min_time_alpha_3 = []
+                    if len(alpha_3_values) == 0:
+                        min_time_alpha_3.append(c)
+                    else:
+                        for alpha_3_opt in alpha_3_values:
+                            alpha_4_values = np.round(np.arange((alpha_3_opt+alpha_steps),c/2,alpha_steps), precision)
+                            min_time_alpha_4 = []
+                            if len(alpha_4_values) == 0:
+                                min_time_alpha_4.append(c)
+                            else:
+                                for alpha_4_opt in alpha_4_values:
+                                    alpha_5_values = np.round(np.arange((alpha_4_opt+alpha_steps),c/2,alpha_steps), precision)
+                                    min_time_alpha_5 = []
+                                    if len(alpha_5_values) == 0:
+                                        min_time_alpha_5.append(c)
+                                    else:
+                                        for alpha_5_opt in alpha_5_values:
+                                            term1 = f(c,c*alpha_1_opt)
+                                            term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_5((0.5 - alpha_2_opt)*c,s)
+                                            term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_5((alpha_2_opt - alpha_1_opt)*c,s)
+
+                                            
+                                            term4 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + T_rec_5((alpha_3_opt-alpha_2_opt)*c,s)
+                                            term5 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + f(c*alpha_4_opt,c*alpha_3_opt)/2 + T_rec_5((alpha_4_opt-alpha_3_opt)*c,s)
+                                            term6 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + f(c*alpha_4_opt,c*alpha_3_opt)/2 + f(c*alpha_5_opt,c*alpha_4_opt)/2 + T_rec_5((alpha_5_opt-alpha_4_opt)*c,s)
+                                            min_time_alpha_5.append(max((term1,term2,term3,term4,term5,term6)))
+                                    min_time_alpha_4.append(min(min_time_alpha_5))
+                            min_time_alpha_3.append(min(min_time_alpha_4))
+                    min_time_alpha_2.append(min(min_time_alpha_3))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+
+
+    return opt_time
 
 
 def main():
