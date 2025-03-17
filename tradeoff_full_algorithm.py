@@ -85,10 +85,10 @@ def find_alpha_c(c, s, atol):
             return result
 
 # Parameters for s and atol
-alpha_steps = 1/1000
-precision = 6
+alpha_steps = 1/100
+precision = 4
 atol = 10**(-precision)
-starting_point = 0.54
+starting_point = 0
 
 # Initialize dictionaries to store results
 
@@ -109,10 +109,10 @@ t_rec_cache = {}
 F_s = {}  # Memoization array for each fixed s
 F_s_rec = {rec : {} for rec in range(max_recursion+1)}
 
-levels = 4
+levels = 1
 parallel = True
 inside_parallel = False
-max_rec = True
+max_rec = False
 
 @lru_cache(maxsize=None)
 def T_rec_1(c, s):
@@ -131,11 +131,9 @@ def T_rec_1(c, s):
 
         elif c > alpha_1 and alpha_1 != 0:
             alpha_1_opt = find_alpha_c(c, alpha_1, atol)
-            term1 = f(c, c / 2) / 2
-            term2 = f(c / 2, alpha_1_opt * c) / 2
-
-            term3 = T_rec_1(c / 2 - alpha_1_opt * c, s)
-            min_time_alpha_1.append(max((term1 + term2 + term3),alpha_1))
+            term1 = f(c,c*alpha_1_opt)
+            term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_1_opt)/2 + T_rec_1((0.5 - alpha_1_opt)*c,s)
+            min_time_alpha_1.append(max(term1,term2))
 
     opt_time =  min(min_time_alpha_1)
 
@@ -280,6 +278,45 @@ def T_rec_2(c, s):
 
     return opt_time
 
+def T_rec_2_memoization(c, s, table):
+
+    
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif (c,s) in table:
+            min_time_alpha_1.append(table[(c,s)])
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+                    term1 = f(c,c*alpha_1_opt)
+                    #print(f'alpha_2_opt - alpha_1_opt: {alpha_2_opt} - {alpha_1_opt} =  {alpha_2_opt - alpha_1_opt}')
+                    term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_2((alpha_2_opt - alpha_1_opt)*c,s)
+
+                    term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_2((0.5 - alpha_2_opt)*c,s)
+                    min_time_alpha_2.append(max((term1,term2,term3)))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+    table[(c,s)] = opt_time
+
+    return opt_time
+
 
 
 @lru_cache(maxsize=None)
@@ -328,7 +365,54 @@ def T_rec_3(c, s):
 
     return opt_time
 
-import numpy as np
+
+def T_rec_3_memoization(c, s, table):
+
+    
+    alpha_1_values = np.round(np.arange(starting_point, (s+alpha_steps), alpha_steps), precision)
+    min_time_alpha_1 = []
+    #c = np.round(c, precision)
+    #print(f'c: {c}, s: {s}, alpha_1_values: {alpha_1_values}')
+    for alpha_1 in alpha_1_values:
+        # print(f'alpha_1: {alpha_1}, c: {c}')
+        if alpha_1 == 0:
+            min_time_alpha_1.append(1)
+            #print('here 1')
+        elif c <= alpha_1 and alpha_1 != 0:
+            min_time_alpha_1.append(c)
+        elif (s,c) in table.keys():
+            min_time_alpha_1.append(table[(s,c)])
+        elif c > alpha_1 and alpha_1 != 0:
+            alpha_1_opt = find_alpha_c(c,alpha_1,atol)
+            
+            alpha_2_values = np.round(np.arange((alpha_1_opt+alpha_steps), c/2,alpha_steps), precision)
+            min_time_alpha_2 = []
+            # print(f'alpha_1: {alpha_1}, alpha_1_opt: {alpha_1_opt}, c: {c}, alpha_2_values: {alpha_2_values}')
+            if len(alpha_2_values) == 0:
+                min_time_alpha_2.append(c)
+            else:
+                for alpha_2_opt in alpha_2_values:
+
+                    alpha_3_values = np.round(np.arange((alpha_2_opt+alpha_steps),c/2,alpha_steps), precision)
+                    min_time_alpha_3 = []
+                    if len(alpha_3_values) == 0:
+                        min_time_alpha_3.append(c)
+                    else:
+                        for alpha_3_opt in alpha_3_values:
+                            term1 = f(c,c*alpha_1_opt)
+                            term2 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + T_rec_3((alpha_2_opt - alpha_1_opt)*c,s)
+
+                            term3 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + T_rec_3((0.5 - alpha_2_opt)*c,s)
+                            term4 = f(c,c*0.5)/2 + f(c*0.5,c*alpha_2_opt)/2 + f(c*alpha_2_opt,c*alpha_1_opt)/2 + f(c*alpha_3_opt,c*alpha_2_opt)/2 + T_rec_3((alpha_3_opt-alpha_2_opt)*c,s)
+                            min_time_alpha_3.append(max((term1,term2,term3,term4)))
+                    min_time_alpha_2.append(min(min_time_alpha_3))
+            min_time_alpha_1.append(min(min_time_alpha_2))
+
+    opt_time =  min(min_time_alpha_1)
+    table[(s,c)] = opt_time
+
+
+    return opt_time
 
 @lru_cache(maxsize=None)
 def T_s_fixed_rec_3_levels(c, s, allowed_recu, current_recursion=1):
@@ -834,6 +918,7 @@ def comparison_plot(F_s_par):
 
 # Wrapper function to allow parallel processing of T_s_fixed_rec
 def process_s(s):
+   # table = {}
 
     if levels == 1:
         result = T_rec_1(1,s)
