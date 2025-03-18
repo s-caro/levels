@@ -146,7 +146,9 @@ def main():
                 
             end_time = time.time()  # End timing
             elapsed_time = end_time - start_time
-            print(f"r : {r} - i : {i} - in time: {time.strftime("%H:%M:%S", time.gmtime(elapsed_time))}")
+            endAll_t = time.localtime()
+            print(f"now: {time.strftime('%d/%b, %H:%M:%S', endAll_t)} - r : {r} - i : {i} - in time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}")
+
         for s in s_values:
             if s == 0:
                 T[(r, s)] = 1
