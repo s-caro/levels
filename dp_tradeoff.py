@@ -4,27 +4,75 @@ from functools import lru_cache
 import os
 import time
 
-def truncate_to_nearest(value, step, valid_values):
+def find_closest_value(sorted_list, target_value):
     """
-    Truncates a float value to the precision of the step, 
-    and returns the closest value from a list of valid values.
+    Finds the closest value in a sorted list to a given target value.
+
+    Args:
+        sorted_list: A list of sorted float values (ascending order).
+        target_value: The target float value.
+
+    Returns:
+        The closest float value in the list to the target value.
+    """
+    if not sorted_list:
+        return None  # Handle empty list
+
+    if target_value <= sorted_list[0]:
+        return sorted_list[0]
+    if target_value >= sorted_list[-1]:
+        return sorted_list[-1]
+
+    left, right = 0, len(sorted_list) - 1
+    while left < right - 1:
+        mid = (left + right) // 2
+        if sorted_list[mid] == target_value:
+            return target_value
+        elif sorted_list[mid] < target_value:
+            left = mid
+        else:
+            right = mid
+    return sorted_list[left] if abs(sorted_list[left] - target_value) <= abs(sorted_list[right] - target_value) else sorted_list[right]
+
+def extract_range_from_closest(sorted_list, start, end):
+    """
+    Extracts a range from a sorted list, based on the closest values to start and end.
+
+    Args:
+        sorted_list: A list of sorted float values (ascending order).
+        start: The starting float value of the desired range.
+        end: The ending float value of the desired range.
+
+    Returns:
+        A list containing the extracted range.
+    """
+    if not sorted_list:
+        return []
+
+    closest_start = find_closest_value(sorted_list, start)
+    closest_end = find_closest_value(sorted_list, end)
+
+    start_index = sorted_list.index(closest_start)
+    end_index = sorted_list.index(closest_end)
+
+    if start_index > end_index:
+        return []  # Return empty list if start is after end
+
+    return sorted_list[start_index : end_index + 1]
+
+def truncate_float(value, step):
+    """
+    Truncates a float value to the precision of the step.
 
     Args:
         value (float): The float value to truncate.
         step (float): The step value, determining the precision.
-        valid_values (list[float]): A list of valid float values.
 
     Returns:
-        float: The closest value from the valid_values list.
+        float: The truncated float value.
     """
     precision = len(str(step).split('.')[1])
-    truncated_value = round(value, precision)
-
-    if truncated_value in valid_values:
-        return truncated_value
-    else:
-        closest_value = min(valid_values, key=lambda x: abs(x - truncated_value))
-        return closest_value
+    return round(value, precision)
 
 def generate_float_range(start, end, step):
     """
@@ -50,22 +98,14 @@ def generate_float_range(start, end, step):
 
     result = []
     current = start
-    precision = len(str(step).split('.')[1])
-    valid_values = []
-    temp_current = start
-
-    while (step > 0 and temp_current <= end) or (step < 0 and temp_current >= end):
-        valid_values.append(round(temp_current, precision))
-        temp_current += step
-    valid_values = sorted(list(set(valid_values)))
 
     while (step > 0 and current <= end) or (step < 0 and current >= end):
-        result.append(truncate_to_nearest(current, step, valid_values))
+        result.append(truncate_float(current, step))
         current += step
 
     # Ensure the end value is included, even if the loop misses it slightly
-    if truncate_to_nearest(current - step, step, valid_values) != truncate_to_nearest(end, step, valid_values):
-        result.append(truncate_to_nearest(end, step, valid_values))
+    if truncate_float(current - step, step) != truncate_float(end, step):
+        result.append(truncate_float(end, step))
 
     # Remove duplicates from rounding errors
     result = sorted(list(set(result)))
@@ -74,8 +114,9 @@ def generate_float_range(start, end, step):
 
 
 
+
 R = 7
-K = 1
+K = 2
 
 # Modify these parameters
 s_steps = 1/200
@@ -187,7 +228,8 @@ def main():
         # Calculate the inverse of entropy H(s) to find maximum allowed alpha
         h_inverse = H_inverse(s, atol)
         # Generate all possible memory values alpha_1 from 0 to H^(-1)(s)
-        alpha_1_values = generate_float_range(0, h_inverse, s_steps)
+        alpha_1_values = extract_range_from_closest(s_values, 0, find_closest_value(s_values, h_inverse))
+        #generate_float_range(0, h_inverse, s_steps)
         # Initialize complexity to 0 for all single-level cases
         for r in range(1, R + 1):
             for alpha_1 in alpha_1_values:
@@ -202,14 +244,16 @@ def main():
             # Inner loop: available memory (s)
             for s in s_values:
                 h_inverse = H_inverse(s, atol)
-                alpha_1_values = generate_float_range(0, h_inverse, s_steps)
+                alpha_1_values = extract_range_from_closest(s_values, 0, find_closest_value(s_values, h_inverse))
+                #generate_float_range(0, h_inverse, s_steps)
                 
                 # For each starting memory allocation alpha_1
                 for alpha_1 in alpha_1_values:
                     # Special case: two-level data structure
                     if i == 2:
                         # Generate possible memory allocations for second level
-                        alpha_2_values = generate_float_range(alpha_1, 1/2, s_steps)
+                        alpha_2_values = extract_range_from_closest(s_values, find_closest_value(s_values, alpha_1), 1/2)
+                        #generate_float_range(alpha_1, 1/2, s_steps)
                         for alpha_2 in alpha_2_values:
                             if alpha_2 == 0 or alpha_2 == alpha_1:
                                 # No complexity when levels have same memory or no memory
@@ -217,15 +261,17 @@ def main():
                             else:
                                 # Compute complexity: entropy term + recursive cost
                                 P[(r, s, alpha_1, 2, alpha_2)] = (0.5 * H(alpha_1 / alpha_2) + 
-                                    (alpha_2 - alpha_1) * T[(r - 1, min(truncate_to_nearest(s / (alpha_2 - alpha_1),s_steps,s_values), 1))])
+                                    (alpha_2 - alpha_1) * T[(r - 1, min(find_closest_value(s_values, s / (alpha_2 - alpha_1)), 1))])
                     
                     # General case: i-level data structure (i ≥ 3)
                     elif i >= 3:
                         # Generate possible memory allocations for level i
-                        alpha_i_values = generate_float_range(alpha_1, 1/2, s_steps)
+                        alpha_i_values = extract_range_from_closest(s_values, find_closest_value(s_values, alpha_1), 1/2)
+                        #generate_float_range(alpha_1, 1/2, s_steps)
                         for alpha_i in alpha_i_values:
                             # Generate possible memory allocations for level i-1
-                            alpha_i_1_values = generate_float_range(alpha_1, alpha_i, s_steps)
+                            alpha_i_1_values = extract_range_from_closest(s_values, find_closest_value(s_values, alpha_1), find_closest_value(s_values, alpha_i))
+                            #generate_float_range(alpha_1, alpha_i, s_steps)
                             # Initialize with worst case complexity
                             P[(r, s, alpha_1, i, alpha_i)] = 1
                             P_temp = 1
@@ -244,8 +290,9 @@ def main():
                                         0.5 * H(alpha_i_1 / alpha_i) + 
                                         max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
                                             (alpha_i - alpha_i_1) * 
-                                            T[(r - 1, min(truncate_to_nearest(s / (alpha_i - alpha_i_1),s_steps,s_values), 1))])
+                                            T[(r - 1, min(find_closest_value(s_values, s / (alpha_i - alpha_i_1)), 1))])
                                     )
+                                    
                                 # Update if better complexity found
                                 P[(r, s, alpha_1, i, alpha_i)] = min(P[(r, s, alpha_1, i, alpha_i)], P_temp)
                 
@@ -258,7 +305,8 @@ def main():
         # After computing all P values for current r, update T values
         for s in s_values:
             h_inverse = H_inverse(s, atol)
-            alpha_1_values = generate_float_range(0, h_inverse, s_steps)
+            alpha_1_values =  extract_range_from_closest(s_values, 0, find_closest_value(s_values, h_inverse))
+            #generate_float_range(0, h_inverse, s_steps)
             # Initialize with worst case
             T[(r, s)] = 1
             T_temp = 1
