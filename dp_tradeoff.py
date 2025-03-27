@@ -118,20 +118,37 @@ def H_inverse(s, atol):
 
 # Plotting function
 def plot_results():
-    # Create the plot
-    plt.figure(figsize=(10, 6))
+    # Create two subplots side by side
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 6))
     colors = plt.cm.viridis(np.linspace(0, 1, R + 1))
 
+    # First plot (original scale)
     for r in range(R + 1):
         s_values = [s for (r_key, s) in T.keys() if r_key == r]
         T_values = [T[(r, s)] for s in s_values]
-        plt.scatter(s_values, T_values, color=colors[r], label=f"r={r}", alpha=0.5)
+        ax1.scatter(s_values, T_values, color=colors[r], label=f"r={r}", alpha=0.5)
 
-    plt.xlabel("s values")
-    plt.ylabel("T values")
-    plt.title("Scatter plot of T values for different r")
-    plt.legend()
-    plt.grid()
+    ax1.set_xlabel("s values")
+    ax1.set_ylabel("T values")
+    ax1.set_title("Scatter plot of T values for different r (auto scale)")
+    ax1.legend()
+    ax1.grid()
+
+    # Second plot (fixed y-axis scale)
+    for r in range(R + 1):
+        s_values = [s for (r_key, s) in T.keys() if r_key == r]
+        T_values = [T[(r, s)] for s in s_values]
+        ax2.scatter(s_values, T_values, color=colors[r], label=f"r={r}", alpha=0.5)
+
+    ax2.set_xlabel("s values")
+    ax2.set_ylabel("T values")
+    ax2.set_title("Scatter plot of T values for different r")
+    ax2.set_ylim(0, 1)
+    ax2.legend()
+    ax2.grid()
+
+    # Adjust layout to prevent overlap
+    plt.tight_layout()
 
     # Create the directory if it doesn't exist
     output_dir = os.path.join(os.getcwd(), f"{K}\\dp\\")
@@ -148,94 +165,91 @@ def plot_results():
 
 
 def main():
-    # Initialize T[0,s] = 1 for all s
+    # Initialize base cases: when r=0, T[0,s] = 1 for all memory values s
     for s in s_values:
         T[(0, s)] = 1
-        # Compute alpha = H(s)
+        # Calculate the inverse of entropy H(s) to find maximum allowed alpha
         h_inverse = H_inverse(s, atol)
-        # Values of allowed memory: alpha_1
+        # Generate all possible memory values alpha_1 from 0 to H^(-1)(s)
         alpha_1_values = generate_float_range(0, h_inverse, s_steps)
-        # Initialize P[r,s, alpha_1,1,alpha_1] = 1 for all alpha_1 < s as the required value is known from the precomputation
+        # Initialize complexity to 0 for all single-level cases
         for r in range(1, R + 1):
             for alpha_1 in alpha_1_values:
                 P[(r, s, alpha_1, 1, alpha_1)] = 0
 
-    # End initialization step
-
-
-    # R loop over all possible allowed recursive calls
+    # Main dynamic programming loops
+    # Outer loop: number of allowed recursive calls (r)
     for r in range(1, R + 1):
-        # i loop over all possible levels
+        # Middle loop: number of levels in the data structure (i)
         for i in range(1, K + 2):
             start_time = time.time()
-            # For each maximum relative amount of memory compute the intermediary values
+            # Inner loop: available memory (s)
             for s in s_values:
-                # Compute alpha = H(s)
                 h_inverse = H_inverse(s, atol)
-                # Values of allowed memory: alpha_1
                 alpha_1_values = generate_float_range(0, h_inverse, s_steps)
+                
+                # For each starting memory allocation alpha_1
                 for alpha_1 in alpha_1_values:
-                    # case for i = 2
+                    # Special case: two-level data structure
                     if i == 2:
-                        # Values of alpha_2 that ranges from alpha_1 to 1/2
+                        # Generate possible memory allocations for second level
                         alpha_2_values = generate_float_range(alpha_1, 1/2, s_steps)
-                        # Save all possible values of alpha_2
                         for alpha_2 in alpha_2_values:
-                            # The partial complexity is 0 is alpha_1 equals alpha_2 (the entropy is 0 and the (alpha_2 - alpha_1) coefficient is 0) or if alpha_2 is 0 (then also alpha_1 is 0 and we have P[(r, s, 0, 2, 0)])
                             if alpha_2 == 0 or alpha_2 == alpha_1:
+                                # No complexity when levels have same memory or no memory
                                 P[(r, s, alpha_1, 2, alpha_2)] = 0
                             else:
-                                P[(r, s, alpha_1, 2, alpha_2)] = 0.5 * H(alpha_1 / alpha_2) + (alpha_2 - alpha_1) * T[(r - 1, min(truncate_float(s / (alpha_2 - alpha_1),s_steps), 1))]
-                    # general case for i>=3
+                                # Compute complexity: entropy term + recursive cost
+                                P[(r, s, alpha_1, 2, alpha_2)] = (0.5 * H(alpha_1 / alpha_2) + 
+                                    (alpha_2 - alpha_1) * T[(r - 1, min(truncate_float(s / (alpha_2 - alpha_1),s_steps), 1))])
+                    
+                    # General case: i-level data structure (i ≥ 3)
                     elif i >= 3:
-                        # Values of alpha_i that ranges from alpha_1 to 1/2
+                        # Generate possible memory allocations for level i
                         alpha_i_values = generate_float_range(alpha_1, 1/2, s_steps)
                         for alpha_i in alpha_i_values:
-                            # Values of alpha_i-1 that ranges from alpha_1 to alpha_i
+                            # Generate possible memory allocations for level i-1
                             alpha_i_1_values = generate_float_range(alpha_1, alpha_i, s_steps)
-                            # Since we need to find the alpha_i-1 value that minimizes P[(r, s, alpha_1, i, alpha_i)] we initiate P[(r, s, alpha_1, i, alpha_i)] to 1
+                            # Initialize with worst case complexity
                             P[(r, s, alpha_1, i, alpha_i)] = 1
-                            # We use a temp value to store the current value for P[(r, s, alpha_1, i, alpha_i)]
                             P_temp = 1
+                            
+                            # Find optimal memory allocation for level i-1
                             for alpha_i_1 in alpha_i_1_values:
-                                # The partial complexity is 0 if alpha_i is 0 (then also alpha_1 is 0 and we have P[(r, s, 0, 2, 0)])
-                                if alpha_i==0:
-                                    P_temp = 0
-                                # If alpha_i and alpha_i-1 have the same value then P[(r, s, alpha_1, i, alpha_i_1)] is equal to P[(r, s, alpha_1, i - 1, alpha_i_1)] since the H(alpha_i_1 / alpha_i) is 0 and the (alpha_i - alpha_i_1) coefficient is 0
+                                if alpha_i == 0:
+                                    P_temp = 0  # No complexity for zero memory
                                 elif alpha_i == alpha_i_1:
-                                    P_temp = (
-                                        P[(r, s, alpha_1, i - 1, alpha_i_1)]
-                                    )
+                                    # When consecutive levels have same memory,
+                                    # complexity comes only from previous level
+                                    P_temp = P[(r, s, alpha_1, i - 1, alpha_i_1)]
                                 else:
+                                    # Compute complexity: entropy term + max(previous level, recursive cost)
                                     P_temp = (
                                         0.5 * H(alpha_i_1 / alpha_i) + 
                                         max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
                                             (alpha_i - alpha_i_1) * 
                                             T[(r - 1, min(truncate_float(s / (alpha_i - alpha_i_1),s_steps), 1))])
                                     )
-                                # We update P[(r, s, alpha_1, i, alpha_i)] value if the new P_temp is better
-                                if P_temp < P[(r, s, alpha_1, i, alpha_i)]:
-                                    P[(r, s, alpha_1, i, alpha_i)] = P_temp
+                                # Update if better complexity found
+                                P[(r, s, alpha_1, i, alpha_i)] = min(P[(r, s, alpha_1, i, alpha_i)], P_temp)
                 
-            end_time = time.time()  # End timing
+            # Log progress with timing information
+            end_time = time.time()
             elapsed_time = end_time - start_time
             endAll_t = time.localtime()
             print(f"now: {time.strftime('%d/%b, %H:%M:%S', endAll_t)} - r : {r} - i : {i} - in time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}")
 
-        # At the end of the computation, given a specific r, of P[(r, s, alpha_1, i, alpha_i)] (for and all i and s), we can compute the values T[(r,s)]
+        # After computing all P values for current r, update T values
         for s in s_values:
             h_inverse = H_inverse(s, atol)
-            # Values of allowed memory: alpha_1
-            alpha_1_values =generate_float_range(0, h_inverse, s_steps)
-            # Since we need to find the alpha_1 value that minimizes T[r,s] we initiate T[r,s] to 1                            
+            alpha_1_values = generate_float_range(0, h_inverse, s_steps)
+            # Initialize with worst case
             T[(r, s)] = 1
-            # We use a temp value to store the current value for T[r,s]
             T_temp = 1
+            # Find optimal alpha_1 that minimizes complexity
             for alpha_1 in alpha_1_values:
-                T_temp = (max(H(alpha_1), 0.5 + P[(r, s, alpha_1, K + 1, 1/2)]))
-                # We update T[r,s] value if the new T_temp is better
-                if T_temp < T[(r, s)]:
-                    T[(r, s)] = T_temp
+                T_temp = max(H(alpha_1), 0.5 + P[(r, s, alpha_1, K + 1, 1/2)])
+                T[(r, s)] = min(T[(r, s)], T_temp)
         print(T)
 
 if __name__ == "__main__":
