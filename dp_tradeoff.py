@@ -4,19 +4,27 @@ from functools import lru_cache
 import os
 import time
 
-def truncate_float(value, step):
+def truncate_to_nearest(value, step, valid_values):
     """
-    Truncates a float value to the precision of the step.
+    Truncates a float value to the precision of the step, 
+    and returns the closest value from a list of valid values.
 
     Args:
         value (float): The float value to truncate.
         step (float): The step value, determining the precision.
+        valid_values (list[float]): A list of valid float values.
 
     Returns:
-        float: The truncated float value.
+        float: The closest value from the valid_values list.
     """
     precision = len(str(step).split('.')[1])
-    return round(value, precision)
+    truncated_value = round(value, precision)
+
+    if truncated_value in valid_values:
+        return truncated_value
+    else:
+        closest_value = min(valid_values, key=lambda x: abs(x - truncated_value))
+        return closest_value
 
 def generate_float_range(start, end, step):
     """
@@ -42,13 +50,22 @@ def generate_float_range(start, end, step):
 
     result = []
     current = start
+    precision = len(str(step).split('.')[1])
+    valid_values = []
+    temp_current = start
+
+    while (step > 0 and temp_current <= end) or (step < 0 and temp_current >= end):
+        valid_values.append(round(temp_current, precision))
+        temp_current += step
+    valid_values = sorted(list(set(valid_values)))
+
     while (step > 0 and current <= end) or (step < 0 and current >= end):
-        result.append(truncate_float(current, step))
+        result.append(truncate_to_nearest(current, step, valid_values))
         current += step
 
     # Ensure the end value is included, even if the loop misses it slightly
-    if truncate_float(current - step, step) != truncate_float(end, step):
-        result.append(truncate_float(end, step))
+    if truncate_to_nearest(current - step, step, valid_values) != truncate_to_nearest(end, step, valid_values):
+        result.append(truncate_to_nearest(end, step, valid_values))
 
     # Remove duplicates from rounding errors
     result = sorted(list(set(result)))
@@ -61,12 +78,11 @@ R = 7
 K = 1
 
 # Modify these parameters
-s_steps = 1/100
+s_steps = 1/200
 starting_point = 0
 
 # Maximum relative amount of memory that we are allowed to use
 s_values = generate_float_range(starting_point, 1, s_steps)  # 0 to 100 inclusive
-
 precision = 4
 atol = 10**(-precision)
 
@@ -143,7 +159,7 @@ def plot_results():
     ax2.set_xlabel("s values")
     ax2.set_ylabel("T values")
     ax2.set_title("Scatter plot of T values for different r")
-    ax2.set_ylim(0, 1)
+    ax2.set_ylim(0, 1.1)
     ax2.legend()
     ax2.grid()
 
@@ -201,7 +217,7 @@ def main():
                             else:
                                 # Compute complexity: entropy term + recursive cost
                                 P[(r, s, alpha_1, 2, alpha_2)] = (0.5 * H(alpha_1 / alpha_2) + 
-                                    (alpha_2 - alpha_1) * T[(r - 1, min(truncate_float(s / (alpha_2 - alpha_1),s_steps), 1))])
+                                    (alpha_2 - alpha_1) * T[(r - 1, min(truncate_to_nearest(s / (alpha_2 - alpha_1),s_steps,s_values), 1))])
                     
                     # General case: i-level data structure (i ≥ 3)
                     elif i >= 3:
@@ -228,7 +244,7 @@ def main():
                                         0.5 * H(alpha_i_1 / alpha_i) + 
                                         max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
                                             (alpha_i - alpha_i_1) * 
-                                            T[(r - 1, min(truncate_float(s / (alpha_i - alpha_i_1),s_steps), 1))])
+                                            T[(r - 1, min(truncate_to_nearest(s / (alpha_i - alpha_i_1),s_steps,s_values), 1))])
                                     )
                                 # Update if better complexity found
                                 P[(r, s, alpha_1, i, alpha_i)] = min(P[(r, s, alpha_1, i, alpha_i)], P_temp)
