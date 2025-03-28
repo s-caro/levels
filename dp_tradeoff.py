@@ -71,7 +71,7 @@ s_steps = [1/100, 1/500, 1/1000]
 starting_point = 0
 
 # Maximum relative amount of memory that we are allowed to use
-s_values = generate_float_range(starting_point, 1, s_steps)  # 0 to 100 inclusive
+s_values = []  # 0 to 100 inclusive
 precision = 8
 atol = 10**(-precision)
 
@@ -179,10 +179,9 @@ def H_inverse(s, atol):
 
 
 # Plotting function
-def plot_results(k, step, output_dir):
-    """Modified plot_results function that takes k, step and output_dir as parameters"""
-    # Create three subplots side by side
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(30, 6))
+def plot_results(k, step):
+    # Create first figure with two subplots side by side
+    fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 6))
     colors = plt.cm.viridis(np.linspace(0, 1, R + 1))
 
     # First plot (original scale)
@@ -210,57 +209,49 @@ def plot_results(k, step, output_dir):
     ax2.legend()
     ax2.grid()
 
-    # Third plot: comparison with theoretical values
-    k_values = np.arange(0, 0.5 + 0.01, 0.01)  # k from 0 to 0.5 with precision 0.01
-    
-    # Theoretical values
-    time_values = (1.12717 ** k_values) * (1.82653 ** 1)
-    space_values = (0.79703 ** k_values) * (1.82653 ** 1)
-    
-    # Convert to log2 scale
-    theoretical_space = 2.0 ** space_values
-    theoretical_time = 2.0 ** time_values
-    
-    # Get r=7 values from T dictionary
-    r7_s_values = [s for (r_key, s) in T.keys() if r_key == R]
-    r7_T_values = [T[(R, s)] for s in r7_s_values]
-    
-    # Convert to log2 scale
-    computed_space = 2.0 ** np.array(r7_s_values)
-    computed_time = 2.0 ** np.array(r7_T_values)
-    
-    # Plot both curves
-    ax3.plot(theoretical_space, theoretical_time, 'b-', label='Theoretical', alpha=0.7)
-    ax3.scatter(computed_space, computed_time, color='red', label=f'Computed (r={R})', alpha=0.7)
-    
-    ax3.set_xlabel("Space (2^s)")
-    ax3.set_ylabel("Time (2^T)")
-    ax3.set_title("Time-Space Trade-off Comparison")
-    ax3.set_xscale('log', base=2)
-    ax3.set_yscale('log', base=2)
-    ax3.legend()
-    ax3.grid(True)
-
-    # Adjust layout to prevent overlap
+    # Adjust layout for first figure
     plt.tight_layout()
 
+    # Create second figure for comparison plot
+    fig2, ax3 = plt.subplots(figsize=(10, 6))
+
+    # Third plot (comparison)
+    k_values = np.arange(0, 0.5 + 0.01, 0.01)
+    time_values = (1.12717 ** k_values) * (1.82653 ** 1)
+    space_values = (0.79703 ** k_values) * (1.82653 ** 1)
+    x_values = [2**s for (r_key, s) in T.keys() if r_key == R]
+    y_values = [2**T[(R, s)] for s in s_values]
+
+    ax3.scatter(x_values, y_values, color="b", label="2^(T[7,s]) (scatter)")
+    ax3.plot(x_values, y_values, color="blue", linestyle="--", label="2^(T[7,s]) (line)")
+    ax3.plot(space_values, time_values, label='Time-Space Complexity (line)', linestyle="--", color='purple')
+    ax3.scatter(space_values, time_values, color="purple", label="Time-Space Complexity (scatter)")
+    ax3.set_title(f'Comparison: Samples {1/step} - {k} alpha values')
+    ax3.set_xlabel("Space Complexity")
+    ax3.set_ylabel("Time Complexity")
+    ax3.grid(True)
+    ax3.legend()
+
     # Create the directory if it doesn't exist
+    output_dir = os.path.join(os.getcwd(), f"{k}\\dp\\")
     os.makedirs(output_dir, exist_ok=True)
 
+    # Save data to file
     with open(os.path.join(output_dir, f"T_values_k_{k}_R_{R}_{step}.txt"), 'w') as f:
         for r in range(R + 1):
             for s in s_values:
                 f.write(f"T[{r}, {s}] = {T[(r, s)]}\n")
-        
-        # Add theoretical values
-        f.write("\nTheoretical values:\n")
-        for k_val, s, t in zip(k_values, space_values, time_values):
-            f.write(f"k={k_val:.2f}, space=2^{s:.4f}, time=2^{t:.4f}\n")
 
-    # Save the plot with specific parameters
-    plt.savefig(os.path.join(output_dir, f"Running_time_s_{step}_k_{k}_R_{R}.pdf"))
+    # Save both plots
+    fig1.savefig(os.path.join(output_dir, f"T_values_s_{step}_k_{k}_R_{R}.pdf"))
+    fig2.savefig(os.path.join(output_dir, f"Comparison_s_{step}_k_{k}_R_{R}.pdf"))
+    
+    # Show both plots
     plt.show()
-    plt.close()  # Close the figure to free memory
+    
+    # Close both figures to free memory
+    plt.close(fig1)
+    plt.close(fig2)
 
 
 def main():
@@ -360,12 +351,9 @@ def main():
                         T[(r, s)] = min(T[(r, s)], T_temp)
                 print(T)
 
-            # Save results for this combination
-            output_dir = os.path.join(os.getcwd(), f"k_{k}\\dp\\step_{str(step).replace('.', '_')}\\")
-            os.makedirs(output_dir, exist_ok=True)
             
             # Call plot_results with specific K and step values
-            plot_results(k, step, output_dir)
+            plot_results(k, step)
 
 if __name__ == "__main__":
     main()
