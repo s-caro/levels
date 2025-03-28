@@ -64,15 +64,15 @@ def generate_float_range(start, end, step):
 
 
 R = 7
-K = 2
+K = [1,2,3,4,5,6]
 
 # Modify these parameters
-s_steps = 1/100
+s_steps = [1/100, 1/500, 1/1000]
 starting_point = 0
 
 # Maximum relative amount of memory that we are allowed to use
 s_values = generate_float_range(starting_point, 1, s_steps)  # 0 to 100 inclusive
-precision = 4
+precision = 8
 atol = 10**(-precision)
 
 # Initialize dictionaries to store results
@@ -244,7 +244,7 @@ def main():
     # Outer loop: number of allowed recursive calls (r)
     for r in range(1, R + 1):
         # Middle loop: number of levels in the data structure (i)
-        for i in range(1, K + 2):
+        for i in range(2, K + 2):
             start_time = time.time()
             # Inner loop: available memory (s)
             for s in s_values:
@@ -265,7 +265,7 @@ def main():
                                 P[(r, s, alpha_1, 2, alpha_2)] = 0
                             else:
                                 # Compute complexity: entropy term + recursive cost
-                                P[(r, s, alpha_1, 2, alpha_2)] = (0.5 * H(alpha_1 / alpha_2) + 
+                                P[(r, s, alpha_1, 2, alpha_2)] = (0.5 *alpha_2* H(alpha_1 / alpha_2) + 
                                     (alpha_2 - alpha_1) * T[(r - 1, min(find_closest_value(s / (alpha_2 - alpha_1)), 1))])
                     
                     # General case: i-level data structure (i ≥ 3)
@@ -292,7 +292,7 @@ def main():
                                 else:
                                     # Compute complexity: entropy term + max(previous level, recursive cost)
                                     P_temp = (
-                                        0.5 * H(alpha_i_1 / alpha_i) + 
+                                        0.5 * alpha_i * H(alpha_i_1 / alpha_i) + 
                                         max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
                                             (alpha_i - alpha_i_1) * 
                                             T[(r - 1, min(find_closest_value(s / (alpha_i - alpha_i_1)), 1))])
