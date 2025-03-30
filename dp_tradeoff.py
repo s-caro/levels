@@ -64,7 +64,7 @@ def generate_float_range(start, end, step):
 
 
 R = 5
-K = 4
+K = 5
 
 # Modify these parameters
 step = 1/500
