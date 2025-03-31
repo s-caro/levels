@@ -64,10 +64,10 @@ def generate_float_range(start, end, step):
 
 
 R = 5
-K = 5
+K = 4
 
 # Modify these parameters
-step = 1/500
+step = 1/700
 starting_point = 0
 
 # Maximum relative amount of memory that we are allowed to use
