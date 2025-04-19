@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "dgSpecHash": "owgtIuDg5ps6kLtmxIymbibCqlJNAf5n5mTFMERzs4YYs6KgeIWAHkmLG7a0LJ3e6b/QAxtjcH5rIgktySKb2Q==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Susanna\\OneDrive - Universita degli Studi Roma Tre (1)\\UNIVERSITA\\DOTTORATO\\Riga\\papers and notes Evgeny\\elaborazioni server\\levels\\other\\dp_tradeoff\\dp_tradeoff\\dp_tradeoff.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Susanna\\.nuget\\packages\\mathnet.numerics\\5.0.0\\mathnet.numerics.5.0.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\microsoft.netcore.platforms\\5.0.0\\microsoft.netcore.platforms.5.0.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\microsoft.netframework.referenceassemblies\\1.0.2\\microsoft.netframework.referenceassemblies.1.0.2.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\microsoft.netframework.referenceassemblies.net461\\1.0.2\\microsoft.netframework.referenceassemblies.net461.1.0.2.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\oxyplot.core\\2.2.0\\oxyplot.core.2.2.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\oxyplot.imagesharp\\2.2.0\\oxyplot.imagesharp.2.2.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\oxyplot.windowsforms\\2.2.0\\oxyplot.windowsforms.2.2.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\sixlabors.fonts\\1.0.0\\sixlabors.fonts.1.0.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\sixlabors.imagesharp\\2.1.9\\sixlabors.imagesharp.2.1.9.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\sixlabors.imagesharp.drawing\\1.0.0\\sixlabors.imagesharp.drawing.1.0.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\5.0.0\\system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512",
+    "C:\\Users\\Susanna\\.nuget\\packages\\system.text.encoding.codepages\\5.0.0\\system.text.encoding.codepages.5.0.0.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1701",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Il pacchetto 'OxyPlot.WindowsForms 2.2.0' è stato ripristinato mediante '.NETFramework,Version=v4.6.1, .NETFramework,Version=v4.6.2, .NETFramework,Version=v4.7, .NETFramework,Version=v4.7.1, .NETFramework,Version=v4.7.2, .NETFramework,Version=v4.8, .NETFramework,Version=v4.8.1' e non mediante il framework di destinazione del progetto 'net6.0'. Questo pacchetto potrebbe non essere completamente compatibile con il progetto.",
+      "libraryId": "OxyPlot.WindowsForms",
+      "targetGraphs": [
+        "net6.0"
+      ]
+    }
+  ]
+}
