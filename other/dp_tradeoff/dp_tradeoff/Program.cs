@@ -20,7 +20,7 @@ using OxyPlot.ImageSharp; // To export plots as images
 class Program
 {
 	static readonly int R = 5;
-	static readonly int K = 6;
+	static readonly int K = 2;
 	static readonly double Step = 1.0 / 1000;
 	static readonly double StartingPoint = 0;
 	static readonly double AllowedError = Math.Pow(10, -8);
@@ -44,13 +44,34 @@ class Program
 					P[(r, s, alpha_1, 1, alpha_1)] = 0;
 			}
 		}
+		//string tOutputDirFileLoad = Path.Combine(Directory.GetCurrentDirectory(), $"{K}\\dp\\");
+		//string tFilePath = Path.Combine(tOutputDirFileLoad, "T_values_k_6_R_5_0,001_partial_3_par.txt");
+		//LoadTFromFile(tFilePath);
+		Console.WriteLine($"Start - {DateTime.Now:dd/MMM, HH:mm:ss}");
 
 		for (int r = 1; r <= R; r++)
 		{
 			for (int i = 2; i <= K + 1; i++)
 			{
-				var tasks = s_values.Select(s => Task.Run(() => ProcessS(s, r, i))).ToArray();
-				Task.WaitAll(tasks);
+				int maxParallelism = 70;
+				using (var semaphore = new SemaphoreSlim(maxParallelism))
+				{
+					var tasks = s_values.Select(async s =>
+					{
+						await semaphore.WaitAsync();
+						try
+						{
+							await Task.Run(() => ProcessS(s, r, i));
+						}
+						finally
+						{
+							semaphore.Release();
+						}
+					}).ToArray();
+
+					Task.WaitAll(tasks); // Wait for all the throttled tasks to complete
+				}
+
 				Console.WriteLine($"step: {Step} - r: {r} - i: {i} done - {DateTime.Now:dd/MMM, HH:mm:ss}");
 			}
 
@@ -106,24 +127,41 @@ class Program
 				foreach (var alpha_i in alpha_i_values)
 				{
 					var alpha_i_1_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), FindClosestValue(alpha_i));
-
-					double[] tempValues = new double[alpha_i_1_values.Count];
-					Parallel.For(0, alpha_i_1_values.Count, idx =>
+					double minP = 1;
+					foreach (var alpha_i_1 in alpha_i_1_values)
 					{
-						double alpha_i_1 = alpha_i_1_values[idx];
 						double temp = (alpha_i == 0) ? 0 :
 							(alpha_i == alpha_i_1) ? P[(r, s, alpha_1, i - 1, alpha_i_1)] :
 							0.5 * alpha_i * H(alpha_i_1 / alpha_i) + Math.Max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
 							(alpha_i - alpha_i_1) * T[(r - 1, Math.Min(FindClosestValue(s / (alpha_i - alpha_i_1)), 1))]);
-						tempValues[idx] = temp;
-					});
 
-					double minP = tempValues.Min();
+						minP = Math.Min(minP, temp);
+					}
 					P[(r, s, alpha_1, i, alpha_i)] = minP;
 				}
 			}
 		}
 	}
+	static void LoadTFromFile(string filePath)
+	{
+		foreach (var line in File.ReadLines(filePath))
+		{
+			if (!line.StartsWith("T[")) continue;
+
+			// Example line: T[2, 0.827] = 0.8831726681194166
+			int idxStart = line.IndexOf('[') + 1;
+			int idxEnd = line.IndexOf(']');
+			string[] indexParts = line.Substring(idxStart, idxEnd - idxStart).Split(',');
+			string valuePart = line.Substring(line.IndexOf('=') + 1).Trim();
+
+			int a = int.Parse(indexParts[0].Trim());
+			double b = double.Parse(indexParts[1].Trim(), CultureInfo.InvariantCulture);
+			double c = double.Parse(valuePart, CultureInfo.InvariantCulture);
+
+			T[(a, b)] = c;
+		}
+	}
+
 
 	static double H(double x) => (x == 0 || x == 1) ? 0 : -x * Math.Log(x, 2) - (1 - x) * Math.Log(1 - x, 2);
 

@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from functools import lru_cache
 import os
 import time
+import pickle
 
 
 
@@ -67,17 +68,22 @@ R = 5
 K = 6
 
 # Modify these parameters
-step = 1/500
+step = 1/100
 starting_point = 0
 
 # Maximum relative amount of memory that we are allowed to use
 s_values = generate_float_range(starting_point, 1, step)  # 0 to 100 inclusive
 precision = 8
-atol = 10**(-precision)
+allowed_error = 10**(-precision)
 
 # Initialize dictionaries to store results
-
-P = {}
+print('load dictionary')
+output_dir = os.path.join(os.getcwd(), f"{K}\\dp\\")
+os.makedirs(output_dir, exist_ok=True)
+with open(os.path.join(output_dir, f"P_values_k_{K}_R_{R}_{step}_partial_1_6.pkl"),  'rb') as f:
+    P = pickle.load(f)
+print('dictionary loaded')
+#P = {}
 T = {}
 
 @lru_cache(maxsize=None)
@@ -135,7 +141,15 @@ def extract_range_from_closest(start, end):
 
     if start_index > end_index:
         return []  # Return empty list if start is after end
-
+    if end == 1/2 and s_values[end_index]< 1/2:
+        res = s_values[start_index : end_index + 1]
+        res.append(1/2)
+        return res
+    if end == 1/2 and s_values[end_index+1]>= 1/2:
+        res = s_values[start_index : end_index]
+        res.append(1/2)
+        return res
+    
     return s_values[start_index : end_index + 1]
 
 # Binary entropy function H(x)
@@ -147,17 +161,17 @@ def H(x):
 
 # H_inverse to compute the value alpha such that alpha = H(s)
 @lru_cache(maxsize=None)
-def H_inverse(s, atol):
+def H_inverse(s, allowed_error):
     left, right = 0, 0.5
-    while right - left > atol:
+    while right - left > allowed_error:
         m1 = left + (right - left) / 3
         m2 = right - (right - left) / 3
         H_m1 = H(m1)
         H_m2 = H(m2)
 
-        if np.isclose(H_m1, s, atol=atol):
+        if np.isclose(H_m1, s, atol=allowed_error):
             return m1
-        if np.isclose(H_m2, s, atol=atol):
+        if np.isclose(H_m2, s, atol=allowed_error):
             return m2
 
         if H_m1 < s:
@@ -244,82 +258,96 @@ def plot_results():
 
 
 def main():
+    v_start_time = time.time()
+     # Create the directory if it doesn't exist
+
 
     # Initialize base cases: when r=0, T[0,s] = 1 for all memory values s
     for s in s_values:
         T[(0, s)] = 1
-        h_inverse = H_inverse(s, atol)
+        h_inverse = H_inverse(s, allowed_error)
         alpha_1_values = extract_range_from_closest(0, find_closest_value(h_inverse))
         for r in range(1, R + 1):
             for alpha_1 in alpha_1_values:
                 P[(r, s, alpha_1, 1, alpha_1)] = 0
 
+
+#0.8614948983
     # Main dynamic programming loops
     # Outer loop: number of allowed recursive calls (r)
     for r in range(1, R + 1):
         # Middle loop: number of levels in the data structure (i)
+
         for i in range(2, K + 2):
-            start_time = time.time()
-            # Inner loop: available memory (s)
-            for s in s_values:
-                h_inverse = H_inverse(s, atol)
-                alpha_1_values = extract_range_from_closest(0, find_closest_value(h_inverse))
-                
-                # For each starting memory allocation alpha_1
-                for alpha_1 in alpha_1_values:
-                    # Special case: two-level data structure
-                    if i == 2:
-                        # Generate possible memory allocations for second level
-                        alpha_2_values = extract_range_from_closest(find_closest_value(alpha_1), 1/2)
-                        for alpha_2 in alpha_2_values:
-                            if alpha_2 == 0 or alpha_2 == alpha_1:
-                                # No complexity when levels have same memory or no memory
-                                P[(r, s, alpha_1, 2, alpha_2)] = 0
-                            else:
-                                # Compute complexity: entropy term + recursive cost
-                                P[(r, s, alpha_1, 2, alpha_2)] = (0.5 *alpha_2* H(alpha_1 / alpha_2) + 
-                                    (alpha_2 - alpha_1) * T[(r - 1, min(find_closest_value(s / (alpha_2 - alpha_1)), 1))])
-                    
-                    # General case: i-level data structure (i ≥ 3)
-                    elif i >= 3:
-                        # Generate possible memory allocations for level i
-                        alpha_i_values = extract_range_from_closest(find_closest_value(alpha_1), 1/2)
-                        for alpha_i in alpha_i_values:
-                            # Generate possible memory allocations for level i-1
-                            alpha_i_1_values = extract_range_from_closest(find_closest_value(alpha_1), find_closest_value(alpha_i))
-                            # Initialize with worst case complexity
-                            P[(r, s, alpha_1, i, alpha_i)] = 1
-                            P_temp = 1
-                            
-                            # Find optimal memory allocation for level i-1
-                            for alpha_i_1 in alpha_i_1_values:
-                                if alpha_i == 0:
-                                    P_temp = 0  # No complexity for zero memory
-                                elif alpha_i == alpha_i_1:
-                                    # When consecutive levels have same memory,
-                                    # complexity comes only from previous level
-                                    P_temp = P[(r, s, alpha_1, i - 1, alpha_i_1)]
+            if r>1 or (r==1 and i==7):
+                start_time = time.time()
+                # Inner loop: available memory (s)
+                for s in s_values:
+                    print(f'start s-r-k: {s}-{r}-{i} at time {time.strftime("%d/%b, %H:%M:%S", time.localtime())}')
+                    h_inverse = H_inverse(s, allowed_error)
+                    alpha_1_values = extract_range_from_closest(0, find_closest_value(h_inverse))
+                    # For each starting memory allocation alpha_1
+                    for alpha_1 in alpha_1_values:
+                        # Special case: two-level data structure
+                        if i == 2:
+                            # Generate possible memory allocations for second level
+                            alpha_2_values = extract_range_from_closest(find_closest_value(alpha_1), 1/2)
+                            for alpha_2 in alpha_2_values:
+                                if alpha_2 == 0 or alpha_2 == alpha_1:
+                                    # No complexity when levels have same memory or no memory
+                                    P[(r, s, alpha_1, 2, alpha_2)] = 0
                                 else:
-                                    # Compute complexity: entropy term + max(previous level, recursive cost)
-                                    P_temp = (
-                                        0.5 * alpha_i * H(alpha_i_1 / alpha_i) + 
-                                        max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
-                                            (alpha_i - alpha_i_1) * 
-                                            T[(r - 1, min(find_closest_value(s / (alpha_i - alpha_i_1)), 1))])
-                                    )
-                                    
-                                # Update if better complexity found
-                                P[(r, s, alpha_1, i, alpha_i)] = min(P[(r, s, alpha_1, i, alpha_i)], P_temp)
-            
-            # Log progress with timing information
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            endAll_t = time.localtime()
-            print(f"now: {time.strftime('%d/%b, %H:%M:%S', endAll_t)} - step : {step} - r : {r} - i : {i} - in time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}")
+                                    # Compute complexity: entropy term + recursive cost
+                                    P[(r, s, alpha_1, 2, alpha_2)] = (0.5 *alpha_2* H(alpha_1 / alpha_2) + 
+                                        (alpha_2 - alpha_1) * T[(r - 1, min(find_closest_value(s / (alpha_2 - alpha_1)), 1))])
+                        
+                        # General case: i-level data structure (i ≥ 3)
+                        elif i >= 3:
+                            # Generate possible memory allocations for level i
+                            
+                            alpha_i_values = extract_range_from_closest(find_closest_value(alpha_1), 1/2)
+                            for alpha_i in alpha_i_values:
+                                # Generate possible memory allocations for level i-1
+                                alpha_i_1_values = extract_range_from_closest(find_closest_value(alpha_1), find_closest_value(alpha_i))
+                                # Initialize with worst case complexity
+                                P[(r, s, alpha_1, i, alpha_i)] = 1
+                                P_temp = 1
+                                
+                                # Find optimal memory allocation for level i-1
+                                for alpha_i_1 in alpha_i_1_values:
+                                    if alpha_i == 0:
+                                        P_temp = 0  # No complexity for zero memory
+                                    elif alpha_i == alpha_i_1:
+                                        # When consecutive levels have same memory,
+                                        # complexity comes only from previous level
+                                        P_temp = P[(r, s, alpha_1, i - 1, alpha_i_1)]
+                                    else:
+                                        # Compute complexity: entropy term + max(previous level, recursive cost)
+                                        P_temp = (
+                                            0.5 * alpha_i * H(alpha_i_1 / alpha_i) + 
+                                            max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
+                                                (alpha_i - alpha_i_1) * 
+                                                T[(r - 1, min(find_closest_value(s / (alpha_i - alpha_i_1)), 1))])
+                                        )
+                                        
+                                    # Update if better complexity found
+                                    P[(r, s, alpha_1, i, alpha_i)] = min(P[(r, s, alpha_1, i, alpha_i)], P_temp)
+                
+
+                output_dir = os.path.join(os.getcwd(), f"{K}\\dp\\")
+                os.makedirs(output_dir, exist_ok=True)
+                with open(os.path.join(output_dir, f"P_values_k_{K}_R_{R}_{step}_partial_{r}_{i}.pkl"),  'wb') as f:
+                    pickle.dump(P, f)
+                # Log progress with timing information
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                endAll_t = time.localtime()
+                print(f"now: {time.strftime('%d/%b, %H:%M:%S', endAll_t)} - step : {step} - r : {r} - i : {i} - in time: {time.strftime('%H:%M:%S', time.gmtime(elapsed_time))}")
 
         # After computing all P values for current r, update T values
+        #print(P)
         for s in s_values:
-            h_inverse = H_inverse(s, atol)
+            h_inverse = H_inverse(s, allowed_error)
             alpha_1_values =  extract_range_from_closest(0, find_closest_value(h_inverse))
             # Initialize with worst case
             T[(r, s)] = 1
@@ -328,10 +356,21 @@ def main():
             for alpha_1 in alpha_1_values:
                 T_temp = max(H(alpha_1), 0.5 + P[(r, s, alpha_1, K + 1, 1/2)])
                 T[(r, s)] = min(T[(r, s)], T_temp)
-            
+    
+            # Create the directory if it doesn't exist
+        output_dir = os.path.join(os.getcwd(), f"{K}\\dp\\")
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, f"T_values_k_{K}_R_{R}_{step}_partial_{r}.pkl"),  'wb') as f:
+            pickle.dump(T, f)
+
 
             
             # Call plot_results with specific K and step values
+    v_end_time = time.time()
+    v_elapsed_time = v_end_time - v_start_time
+    v_endAll_t = time.localtime()
+    print(f"now: {time.strftime('%d/%b, %H:%M:%S', v_endAll_t)} - in time: {time.strftime('%H:%M:%S', time.gmtime(v_elapsed_time))}")
+
     plot_results()
 
 if __name__ == "__main__":

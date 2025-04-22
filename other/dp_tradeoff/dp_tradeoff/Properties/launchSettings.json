@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "dp_tradeoff": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "COMPlus_GCCpuGroup": "1",
+        "COMPlus_Thread_UseAllCpuGroups": "1",
+        "COMPlus_gcServer": "1"
+      }
+    }
+  }
+}
