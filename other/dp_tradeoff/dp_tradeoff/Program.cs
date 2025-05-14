@@ -20,13 +20,14 @@ using OxyPlot.ImageSharp; // To export plots as images
 class Program
 {
 	static readonly int R = 5;
-	static readonly int K = 2;
+	static readonly int K = 5;
 	static readonly double Step = 1.0 / 1000;
 	static readonly double StartingPoint = 0;
 	static readonly double AllowedError = Math.Pow(10, -8);
 	static List<double> s_values = GenerateFloatRange(StartingPoint, 1, Step);
 
 	static ConcurrentDictionary<(int, double), double> T = new();
+	static ConcurrentDictionary<(int, double), double> T_each = new();
 	static ConcurrentDictionary<(int, double, double, int, double), double> P = new();
 
 	static void Main()
@@ -44,35 +45,61 @@ class Program
 					P[(r, s, alpha_1, 1, alpha_1)] = 0;
 			}
 		}
-		//string tOutputDirFileLoad = Path.Combine(Directory.GetCurrentDirectory(), $"{K}\\dp\\");
-		//string tFilePath = Path.Combine(tOutputDirFileLoad, "T_values_k_6_R_5_0,001_partial_3_par.txt");
-		//LoadTFromFile(tFilePath);
+
 		Console.WriteLine($"Start - {DateTime.Now:dd/MMM, HH:mm:ss}");
 
 		for (int r = 1; r <= R; r++)
 		{
 			for (int i = 2; i <= K + 1; i++)
 			{
-				int maxParallelism = 70;
-				using (var semaphore = new SemaphoreSlim(maxParallelism))
-				{
-					var tasks = s_values.Select(async s =>
-					{
-						await semaphore.WaitAsync();
-						try
-						{
-							await Task.Run(() => ProcessS(s, r, i));
-						}
-						finally
-						{
-							semaphore.Release();
-						}
-					}).ToArray();
+				//int maxParallelism = 110;
+				//using (var semaphore = new SemaphoreSlim(maxParallelism))
+				//{
+				//	var tasks = s_values.Select(async s =>
+				//	{
+				//		await semaphore.WaitAsync();
+				//		try
+				//		{
+				//			await Task.Run(() => ProcessS(s, r, i));
+				//		}
+				//		finally
+				//		{
+				//			semaphore.Release();
+				//		}
+				//	}).ToArray();
 
-					Task.WaitAll(tasks); // Wait for all the throttled tasks to complete
-				}
+				//	Task.WaitAll(tasks); // Wait for all the throttled tasks to complete
+				//}
+				var tasks = s_values.Select(s => Task.Run(() => ProcessS(s, r, i))).ToArray();
+				Task.WaitAll(tasks);
 
 				Console.WriteLine($"step: {Step} - r: {r} - i: {i} done - {DateTime.Now:dd/MMM, HH:mm:ss}");
+				Console.WriteLine($"Start writing dictionary - {DateTime.Now:dd/MMM, HH:mm:ss}");
+				foreach (var s in s_values)
+				{
+					double h_inv = HInverse(s, AllowedError);
+					var alpha_1_values = ExtractRangeFromClosest(0, FindClosestValue(h_inv));
+
+					T_each[(r, s)] = 1;
+					foreach (var alpha_1 in alpha_1_values)
+					{
+						double val = Math.Max(H(alpha_1), 0.5 + P[(r, s, alpha_1, i, 0.5)]);
+						T_each[(r, s)] = Math.Min(T_each[(r, s)], val);
+					}
+				}
+				// Save partial T results
+				string tOutputDir_each = Path.Combine(Directory.GetCurrentDirectory(), $"{i-1}\\dp\\");
+				Directory.CreateDirectory(tOutputDir_each);
+
+				using (StreamWriter writer = new StreamWriter(Path.Combine(tOutputDir_each, $"T_values_k_{i-1}_R_{R}_{Step}_partial_{r}_par_with_best_T_each.txt")))
+				{
+
+					foreach (var key in T_each.Keys)
+					{
+						writer.WriteLine($"T[{key.Item1}, {key.Item2}] = {T_each[key]}");
+					}
+				}
+				Console.WriteLine($"End writing dictionary - {DateTime.Now:dd/MMM, HH:mm:ss}");
 			}
 
 			foreach (var s in s_values)
@@ -91,7 +118,7 @@ class Program
 			string tOutputDir = Path.Combine(Directory.GetCurrentDirectory(), $"{K}\\dp\\");
 			Directory.CreateDirectory(tOutputDir);
 
-			using (StreamWriter writer = new StreamWriter(Path.Combine(tOutputDir, $"T_values_k_{K}_R_{R}_{Step}_partial_{r}_par.txt")))
+			using (StreamWriter writer = new StreamWriter(Path.Combine(tOutputDir, $"T_values_k_{K}_R_{R}_{Step}_partial_{r}_par_with_best.txt")))
 			{
 				
 				foreach (var key in T.Keys)
@@ -113,55 +140,63 @@ class Program
 		{
 			if (i == 2)
 			{
-				var alpha_2_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), 0.5);
-				foreach (var alpha_2 in alpha_2_values)
+				if (s >= 0.902)
 				{
-					double val = (alpha_2 == 0 || alpha_2 == alpha_1) ? 0 :
-						0.5 * alpha_2 * H(alpha_1 / alpha_2) + (alpha_2 - alpha_1) * T[(r - 1, Math.Min(FindClosestValue(s / (alpha_2 - alpha_1)), 1))];
-					P[(r, s, alpha_1, 2, alpha_2)] = val;
+					P[(r, s, alpha_1, 2, 0.5)] = 0.90144039158 - 0.5;
+				}
+				else
+				{
+					var alpha_2_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), 0.5);
+					foreach (var alpha_2 in alpha_2_values)
+					{
+						double val = (alpha_2 == 0 || alpha_2 == alpha_1) ? 0 :
+							0.5 * alpha_2 * H(alpha_1 / alpha_2) + (alpha_2 - alpha_1) * T[(r - 1, Math.Min(FindClosestValue(s / (alpha_2 - alpha_1)), 1))];
+						P[(r, s, alpha_1, 2, alpha_2)] = val;
+					}
 				}
 			}
 			else
 			{
-				var alpha_i_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), 0.5);
-				foreach (var alpha_i in alpha_i_values)
+				if (i == 3 && s >= 0.869)
 				{
-					var alpha_i_1_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), FindClosestValue(alpha_i));
-					double minP = 1;
-					foreach (var alpha_i_1 in alpha_i_1_values)
+					P[(r, s, alpha_1, 3, 0.5)] = 0.86838650181 - 0.5;
+				}
+				else if (i == 4 && s >= 0.863)
+				{
+					P[(r, s, alpha_1, 4, 0.5)] = 0.86250296836 - 0.5;
+					
+				}
+				else if (i == 5 && s >= 0.862)
+				{
+					P[(r, s, alpha_1, 5, 0.5)] = 0.86161399838 - 0.5;
+				}
+				else if (i == 6 && s >= 0.862)
+				{
+					P[(r, s, alpha_1, 6, 0.5)] = 0.8614948983 - 0.5;
+				}
+				else
+				{
+					var alpha_i_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), 0.5);
+					foreach (var alpha_i in alpha_i_values)
 					{
-						double temp = (alpha_i == 0) ? 0 :
-							(alpha_i == alpha_i_1) ? P[(r, s, alpha_1, i - 1, alpha_i_1)] :
-							0.5 * alpha_i * H(alpha_i_1 / alpha_i) + Math.Max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
-							(alpha_i - alpha_i_1) * T[(r - 1, Math.Min(FindClosestValue(s / (alpha_i - alpha_i_1)), 1))]);
+						var alpha_i_1_values = ExtractRangeFromClosest(FindClosestValue(alpha_1), FindClosestValue(alpha_i));
+						double minP = 1;
+						foreach (var alpha_i_1 in alpha_i_1_values)
+						{
+							double temp = (alpha_i == 0) ? 0 :
+								(alpha_i == alpha_i_1) ? P[(r, s, alpha_1, i - 1, alpha_i_1)] :
+								0.5 * alpha_i * H(alpha_i_1 / alpha_i) + Math.Max(P[(r, s, alpha_1, i - 1, alpha_i_1)],
+								(alpha_i - alpha_i_1) * T[(r - 1, Math.Min(FindClosestValue(s / (alpha_i - alpha_i_1)), 1))]);
 
-						minP = Math.Min(minP, temp);
+							minP = Math.Min(minP, temp);
+						}
+						P[(r, s, alpha_1, i, alpha_i)] = minP;
 					}
-					P[(r, s, alpha_1, i, alpha_i)] = minP;
 				}
 			}
 		}
 	}
-	static void LoadTFromFile(string filePath)
-	{
-		foreach (var line in File.ReadLines(filePath))
-		{
-			if (!line.StartsWith("T[")) continue;
-
-			// Example line: T[2, 0.827] = 0.8831726681194166
-			int idxStart = line.IndexOf('[') + 1;
-			int idxEnd = line.IndexOf(']');
-			string[] indexParts = line.Substring(idxStart, idxEnd - idxStart).Split(',');
-			string valuePart = line.Substring(line.IndexOf('=') + 1).Trim();
-
-			int a = int.Parse(indexParts[0].Trim());
-			double b = double.Parse(indexParts[1].Trim(), CultureInfo.InvariantCulture);
-			double c = double.Parse(valuePart, CultureInfo.InvariantCulture);
-
-			T[(a, b)] = c;
-		}
-	}
-
+	
 
 	static double H(double x) => (x == 0 || x == 1) ? 0 : -x * Math.Log(x, 2) - (1 - x) * Math.Log(1 - x, 2);
 
